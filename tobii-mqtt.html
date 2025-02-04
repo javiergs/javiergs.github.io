@@ -8,13 +8,18 @@
     <!-- MQTT.js for WebSockets -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.2.6/mqtt.min.js"></script>
 
-    <!-- Chart.js for visualization -->
+    <!-- Chart.js for graphs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.3.0/chart.umd.min.js"></script>
 
+    <!-- heatmap.js for gaze intensity -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.5/heatmap.min.js"></script>
+
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; }
+        body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f4; }
         #status { margin-top: 10px; font-weight: bold; color: green; }
-        canvas { max-width: 600px; margin: 20px auto; }
+        canvas { max-width: 600px; margin: 20px auto; display: block; background: white; }
+        #heatmapContainer { width: 600px; height: 400px; margin: 20px auto; position: relative; border: 1px solid #ccc; }
+        #heatmap { width: 100%; height: 100%; position: absolute; }
     </style>
 </head>
 <body>
@@ -27,10 +32,13 @@
     <h3>Pupil Sizes</h3>
     <canvas id="pupilChart"></canvas>
 
+    <h3>Heatmap of Gaze Intensity</h3>
+    <div id="heatmapContainer">
+        <div id="heatmap"></div>
+    </div>
+
     <script>
-        const mqttBroker = "wss://test.mosquitto.org:8081"; // Secure WebSocket connection
-        //const mqttBroker = "wss://test.mosquitto.org:8080"; 
-        // WebSockets for MQTT
+        const mqttBroker = "wss://test.mosquitto.org:8081"; // ✅ Secure WebSocket connection
         const topic = "javiergs/tobii/gazedata";
 
         // Connect to MQTT broker
@@ -54,7 +62,7 @@
         });
 
         // Data storage for charts
-        const maxDataPoints = 20;
+        const maxDataPoints = 30;
         let gazeData = [];
         let pupilSizes = { left: [], right: [] };
 
@@ -69,7 +77,14 @@
                 ]
             },
             options: {
-                scales: { x: { min: 0, max: 1 }, y: { min: 0, max: 1 } }
+                scales: { 
+                    x: { min: 0, max: 1, title: { display: true, text: "X Position" } },
+                    y: { 
+                        min: 0, max: 1, 
+                        title: { display: true, text: "Y Position (Flipped)" },
+                        reverse: true  // ✅ Flips the Y-axis so 0 is at the top
+                    } 
+                }
             }
         });
 
@@ -80,11 +95,20 @@
             data: {
                 labels: [],
                 datasets: [
-                    { label: "Left Pupil", data: [], borderColor: "blue", fill: false },
-                    { label: "Right Pupil", data: [], borderColor: "red", fill: false }
+                    { label: "Left Pupil", data: [], borderColor: "blue", fill: false, borderWidth: 2 },
+                    { label: "Right Pupil", data: [], borderColor: "red", fill: false, borderWidth: 2 }
                 ]
             },
             options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        // Create Heatmap
+        const heatmap = h337.create({
+            container: document.getElementById("heatmap"),
+            radius: 20,
+            maxOpacity: 0.6,
+            minOpacity: 0.2,
+            blur: 0.75,
         });
 
         // Handle Incoming MQTT Messages
@@ -92,6 +116,13 @@
             try {
                 const data = JSON.parse(message.toString());
                 console.log("📩 Received MQTT Message:", data);
+
+                // Normalize gaze coordinates to fit heatmap container
+                const heatmapX = Math.floor(data.left_eye.x * 600);  // Scale to 600px width
+                const heatmapY = Math.floor(data.left_eye.y * 400);  // Scale to 400px height
+
+                // Update heatmap
+                heatmap.addData({ x: heatmapX, y: heatmapY, value: 1 });
 
                 // Update gaze points
                 gazeData.push({ left: { x: data.left_eye.x, y: data.left_eye.y }, right: { x: data.right_eye.x, y: data.right_eye.y } });
