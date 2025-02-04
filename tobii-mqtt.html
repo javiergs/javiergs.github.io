@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eye Tracking Visualization</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #status { margin-top: 10px; font-weight: bold; }
+        canvas { max-width: 600px; margin: 20px auto; }
+    </style>
+</head>
+<body>
+    <h1>Live Eye Tracking Data</h1>
+    <p id="status">Connecting to MQTT Broker...</p>
+    
+    <h3>Gaze Points</h3>
+    <canvas id="gazeChart"></canvas>
+
+    <h3>Pupil Sizes</h3>
+    <canvas id="pupilChart"></canvas>
+
+    <script>
+        const mqttBroker = "wss://test.mosquitto.org:8081"; // WebSockets for MQTT
+        const topic = "javiergs/tobii/gazedata";
+
+        // MQTT Client
+        const client = mqtt.connect(mqttBroker);
+
+        client.on("connect", () => {
+            document.getElementById("status").innerText = "Connected to MQTT Broker!";
+            client.subscribe(topic, (err) => {
+                if (err) console.error("Subscription error:", err);
+            });
+        });
+
+        client.on("error", (err) => {
+            document.getElementById("status").innerText = "MQTT Connection Error!";
+            console.error("MQTT Error:", err);
+        });
+
+        // Data storage for charts
+        const maxDataPoints = 20;
+        let gazeData = [];
+        let pupilSizes = { left: [], right: [] };
+
+        // Create Gaze Chart
+        const ctxGaze = document.getElementById("gazeChart").getContext("2d");
+        const gazeChart = new Chart(ctxGaze, {
+            type: "scatter",
+            data: {
+                datasets: [
+                    { label: "Left Eye", data: [], borderColor: "blue", backgroundColor: "rgba(0, 0, 255, 0.5)", pointRadius: 5 },
+                    { label: "Right Eye", data: [], borderColor: "red", backgroundColor: "rgba(255, 0, 0, 0.5)", pointRadius: 5 }
+                ]
+            },
+            options: {
+                scales: { x: { min: 0, max: 1 }, y: {
