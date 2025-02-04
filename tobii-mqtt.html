@@ -58,6 +58,130 @@
             console.error("MQTT Error:", err);
         });
 
+        // Function to draw fading heatmap effect
+        function fadeCanvas() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.1)";  // Light fade over time
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Function to draw eye tracking circles + heatmap
+        function drawEyeTracking(leftEye, rightEye) {
+            fadeCanvas(); // Gradually fade old points
+
+            // Convert screen % to actual pixel positions
+            const leftX = leftEye.x * canvas.width;
+            const leftY = leftEye.y * canvas.height;
+            const rightX = rightEye.x * canvas.width;
+            const rightY = rightEye.y * canvas.height;
+
+            // Adjusted pupil size scaling for smaller circles
+            const leftPupilSize = leftEye.pupil * 5;  // 🔵 Reduce size
+            const rightPupilSize = rightEye.pupil * 5; // 🔴 Reduce size
+
+            // Draw left eye
+            ctx.beginPath();
+            ctx.arc(leftX, leftY, leftPupilSize, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(0, 0, 255, 0.5)";  // Blue for left eye
+            ctx.fill();
+            ctx.closePath();
+
+            // Draw right eye
+            ctx.beginPath();
+            ctx.arc(rightX, rightY, rightPupilSize, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(255, 0, 0, 0.5)";  // Red for right eye
+            ctx.fill();
+            ctx.closePath();
+
+            // Draw heatmap effect (persistent dimmed circles)
+            ctx.beginPath();
+            ctx.arc(leftX, leftY, leftPupilSize * 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(0, 0, 255, 0.1)";  // Faint blue trail
+            ctx.fill();
+            ctx.closePath();
+
+            ctx.beginPath();
+            ctx.arc(rightX, rightY, rightPupilSize * 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(255, 0, 0, 0.1)";  // Faint red trail
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        // Handle Incoming MQTT Messages
+        client.on("message", (topic, message) => {
+            try {
+                const data = JSON.parse(message.toString());
+                console.log("📩 Received Data:", data);
+
+                drawEyeTracking(data.left_eye, data.right_eye);
+            } catch (error) {
+                console.error("Invalid MQTT Message:", error);
+            }
+        });
+    </script>
+</body>
+</html>
+
+<!--
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eye Tracking Visualization</title>
+
+    <!-- MQTT.js for WebSockets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.2.6/mqtt.min.js"></script>
+
+    <style>
+        body { 
+            margin: 0;
+            overflow: hidden;
+            background: black;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="eyeCanvas"></canvas>
+
+    <script>
+        const mqttBroker = "wss://test.mosquitto.org:8081"; // ✅ Secure WebSocket connection
+        const topic = "javiergs/tobii/gazedata";
+
+        // Canvas setup
+        const canvas = document.getElementById("eyeCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Resize canvas to fit window
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+
+        // Connect to MQTT broker
+        const client = mqtt.connect(mqttBroker);
+        
+        client.on("connect", () => {
+            console.log("✅ Connected to MQTT Broker!");
+            client.subscribe(topic, (err) => {
+                if (err) {
+                    console.error("❌ Subscription error:", err);
+                } else {
+                    console.log("✅ Subscribed to topic:", topic);
+                }
+            });
+        });
+
+        client.on("error", (err) => {
+            console.error("MQTT Error:", err);
+        });
+
         // Function to draw eye circles
         function drawEyeTracking(leftEye, rightEye) {
             ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
@@ -101,3 +225,4 @@
     </script>
 </body>
 </html>
+-->
