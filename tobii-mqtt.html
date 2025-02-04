@@ -4,11 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eye Tracking Visualization</title>
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- MQTT.js for WebSockets -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.2.6/mqtt.min.js"></script>
+
+    <!-- Chart.js for visualization -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.3.0/chart.umd.min.js"></script>
+
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
-        #status { margin-top: 10px; font-weight: bold; }
+        #status { margin-top: 10px; font-weight: bold; color: green; }
         canvas { max-width: 600px; margin: 20px auto; }
     </style>
 </head>
@@ -23,16 +28,21 @@
     <canvas id="pupilChart"></canvas>
 
     <script>
-        const mqttBroker = "wss://test.mosquitto.org:8081"; // WebSockets for MQTT
+        const mqttBroker = "wss://test.mosquitto.org:8080"; // WebSockets for MQTT
         const topic = "javiergs/tobii/gazedata";
 
-        // MQTT Client
+        // Connect to MQTT broker
         const client = mqtt.connect(mqttBroker);
 
         client.on("connect", () => {
+            console.log("✅ Connected to MQTT Broker!");
             document.getElementById("status").innerText = "Connected to MQTT Broker!";
             client.subscribe(topic, (err) => {
-                if (err) console.error("Subscription error:", err);
+                if (err) {
+                    console.error("❌ Subscription error:", err);
+                } else {
+                    console.log("✅ Subscribed to topic:", topic);
+                }
             });
         });
 
@@ -46,7 +56,7 @@
         let gazeData = [];
         let pupilSizes = { left: [], right: [] };
 
-        // Create Gaze Chart
+        // Create Gaze Chart (Scatter Plot)
         const ctxGaze = document.getElementById("gazeChart").getContext("2d");
         const gazeChart = new Chart(ctxGaze, {
             type: "scatter",
@@ -57,4 +67,55 @@
                 ]
             },
             options: {
-                scales: { x: { min: 0, max: 1 }, y: {
+                scales: { x: { min: 0, max: 1 }, y: { min: 0, max: 1 } }
+            }
+        });
+
+        // Create Pupil Size Chart (Line Chart)
+        const ctxPupil = document.getElementById("pupilChart").getContext("2d");
+        const pupilChart = new Chart(ctxPupil, {
+            type: "line",
+            data: {
+                labels: [],
+                datasets: [
+                    { label: "Left Pupil", data: [], borderColor: "blue", fill: false },
+                    { label: "Right Pupil", data: [], borderColor: "red", fill: false }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        // Handle Incoming MQTT Messages
+        client.on("message", (topic, message) => {
+            try {
+                const data = JSON.parse(message.toString());
+                console.log("📩 Received MQTT Message:", data);
+
+                // Update gaze points
+                gazeData.push({ left: { x: data.left_eye.x, y: data.left_eye.y }, right: { x: data.right_eye.x, y: data.right_eye.y } });
+                if (gazeData.length > maxDataPoints) gazeData.shift();
+
+                // Update pupil sizes
+                pupilSizes.left.push(data.left_eye.pupil);
+                pupilSizes.right.push(data.right_eye.pupil);
+                if (pupilSizes.left.length > maxDataPoints) pupilSizes.left.shift();
+                if (pupilSizes.right.length > maxDataPoints) pupilSizes.right.shift();
+
+                // Update Gaze Chart
+                gazeChart.data.datasets[0].data = gazeData.map(d => ({ x: d.left.x, y: d.left.y }));
+                gazeChart.data.datasets[1].data = gazeData.map(d => ({ x: d.right.x, y: d.right.y }));
+                gazeChart.update();
+
+                // Update Pupil Size Chart
+                pupilChart.data.labels = Array.from({ length: pupilSizes.left.length }, (_, i) => i);
+                pupilChart.data.datasets[0].data = pupilSizes.left;
+                pupilChart.data.datasets[1].data = pupilSizes.right;
+                pupilChart.update();
+
+            } catch (error) {
+                console.error("Invalid MQTT Message:", error);
+            }
+        });
+    </script>
+</body>
+</html>
