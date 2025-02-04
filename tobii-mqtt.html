@@ -28,7 +28,9 @@
     <canvas id="pupilChart"></canvas>
 
     <script>
-        const mqttBroker = "wss://test.mosquitto.org:8080"; // WebSockets for MQTT
+        const mqttBroker = "wss://test.mosquitto.org:8081"; // Secure WebSocket connection
+        //const mqttBroker = "wss://test.mosquitto.org:8080"; 
+        // WebSockets for MQTT
         const topic = "javiergs/tobii/gazedata";
 
         // Connect to MQTT broker
