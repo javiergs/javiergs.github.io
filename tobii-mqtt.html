@@ -4,49 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eye Tracking Visualization</title>
-    
+
     <!-- MQTT.js for WebSockets -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.2.6/mqtt.min.js"></script>
 
-    <!-- Chart.js for graphs -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.3.0/chart.umd.min.js"></script>
-
-    <!-- heatmap.js for gaze intensity -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.5/heatmap.min.js"></script>
-
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f4; }
-        #status { margin-top: 10px; font-weight: bold; color: green; }
-        canvas { max-width: 600px; margin: 20px auto; display: block; background: white; }
-        #heatmapContainer { width: 600px; height: 400px; margin: 20px auto; position: relative; border: 1px solid #ccc; }
-        #heatmap { width: 100%; height: 100%; position: absolute; }
+        body { 
+            margin: 0;
+            overflow: hidden;
+            background: black;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
     </style>
 </head>
 <body>
-    <h1>Live Eye Tracking Data</h1>
-    <p id="status">Connecting to MQTT Broker...</p>
-    
-    <h3>Gaze Points</h3>
-    <canvas id="gazeChart"></canvas>
-
-    <h3>Pupil Sizes</h3>
-    <canvas id="pupilChart"></canvas>
-
-    <h3>Heatmap of Gaze Intensity</h3>
-    <div id="heatmapContainer">
-        <div id="heatmap"></div>
-    </div>
+    <canvas id="eyeCanvas"></canvas>
 
     <script>
         const mqttBroker = "wss://test.mosquitto.org:8081"; // ✅ Secure WebSocket connection
         const topic = "javiergs/tobii/gazedata";
 
+        // Canvas setup
+        const canvas = document.getElementById("eyeCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Resize canvas to fit window
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+
         // Connect to MQTT broker
         const client = mqtt.connect(mqttBroker);
-
+        
         client.on("connect", () => {
             console.log("✅ Connected to MQTT Broker!");
-            document.getElementById("status").innerText = "Connected to MQTT Broker!";
             client.subscribe(topic, (err) => {
                 if (err) {
                     console.error("❌ Subscription error:", err);
@@ -57,94 +55,45 @@
         });
 
         client.on("error", (err) => {
-            document.getElementById("status").innerText = "MQTT Connection Error!";
             console.error("MQTT Error:", err);
         });
 
-        // Data storage for charts
-        const maxDataPoints = 30;
-        let gazeData = [];
-        let pupilSizes = { left: [], right: [] };
+        // Function to draw eye circles
+        function drawEyeTracking(leftEye, rightEye) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
 
-        // Create Gaze Chart (Scatter Plot)
-        const ctxGaze = document.getElementById("gazeChart").getContext("2d");
-        const gazeChart = new Chart(ctxGaze, {
-            type: "scatter",
-            data: {
-                datasets: [
-                    { label: "Left Eye", data: [], borderColor: "blue", backgroundColor: "rgba(0, 0, 255, 0.5)", pointRadius: 5 },
-                    { label: "Right Eye", data: [], borderColor: "red", backgroundColor: "rgba(255, 0, 0, 0.5)", pointRadius: 5 }
-                ]
-            },
-            options: {
-                scales: { 
-                    x: { min: 0, max: 1, title: { display: true, text: "X Position" } },
-                    y: { 
-                        min: 0, max: 1, 
-                        title: { display: true, text: "Y Position (Flipped)" },
-                        reverse: true  // ✅ Flips the Y-axis so 0 is at the top
-                    } 
-                }
-            }
-        });
+            // Convert screen % to actual pixel positions
+            const leftX = leftEye.x * canvas.width;
+            const leftY = leftEye.y * canvas.height;
+            const rightX = rightEye.x * canvas.width;
+            const rightY = rightEye.y * canvas.height;
 
-        // Create Pupil Size Chart (Line Chart)
-        const ctxPupil = document.getElementById("pupilChart").getContext("2d");
-        const pupilChart = new Chart(ctxPupil, {
-            type: "line",
-            data: {
-                labels: [],
-                datasets: [
-                    { label: "Left Pupil", data: [], borderColor: "blue", fill: false, borderWidth: 2 },
-                    { label: "Right Pupil", data: [], borderColor: "red", fill: false, borderWidth: 2 }
-                ]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
+            // Scale pupil size for visualization
+            const leftPupilSize = leftEye.pupil * 10;  // Scaled for visibility
+            const rightPupilSize = rightEye.pupil * 10;
 
-        // Create Heatmap
-        const heatmap = h337.create({
-            container: document.getElementById("heatmap"),
-            radius: 20,
-            maxOpacity: 0.6,
-            minOpacity: 0.2,
-            blur: 0.75,
-        });
+            // Draw left eye
+            ctx.beginPath();
+            ctx.arc(leftX, leftY, leftPupilSize, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(0, 0, 255, 0.7)";  // Blue for left eye
+            ctx.fill();
+            ctx.closePath();
+
+            // Draw right eye
+            ctx.beginPath();
+            ctx.arc(rightX, rightY, rightPupilSize, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(255, 0, 0, 0.7)";  // Red for right eye
+            ctx.fill();
+            ctx.closePath();
+        }
 
         // Handle Incoming MQTT Messages
         client.on("message", (topic, message) => {
             try {
                 const data = JSON.parse(message.toString());
-                console.log("📩 Received MQTT Message:", data);
+                console.log("📩 Received Data:", data);
 
-                // Normalize gaze coordinates to fit heatmap container
-                const heatmapX = Math.floor(data.left_eye.x * 600);  // Scale to 600px width
-                const heatmapY = Math.floor(data.left_eye.y * 400);  // Scale to 400px height
-
-                // Update heatmap
-                heatmap.addData({ x: heatmapX, y: heatmapY, value: 1 });
-
-                // Update gaze points
-                gazeData.push({ left: { x: data.left_eye.x, y: data.left_eye.y }, right: { x: data.right_eye.x, y: data.right_eye.y } });
-                if (gazeData.length > maxDataPoints) gazeData.shift();
-
-                // Update pupil sizes
-                pupilSizes.left.push(data.left_eye.pupil);
-                pupilSizes.right.push(data.right_eye.pupil);
-                if (pupilSizes.left.length > maxDataPoints) pupilSizes.left.shift();
-                if (pupilSizes.right.length > maxDataPoints) pupilSizes.right.shift();
-
-                // Update Gaze Chart
-                gazeChart.data.datasets[0].data = gazeData.map(d => ({ x: d.left.x, y: d.left.y }));
-                gazeChart.data.datasets[1].data = gazeData.map(d => ({ x: d.right.x, y: d.right.y }));
-                gazeChart.update();
-
-                // Update Pupil Size Chart
-                pupilChart.data.labels = Array.from({ length: pupilSizes.left.length }, (_, i) => i);
-                pupilChart.data.datasets[0].data = pupilSizes.left;
-                pupilChart.data.datasets[1].data = pupilSizes.right;
-                pupilChart.update();
-
+                drawEyeTracking(data.left_eye, data.right_eye);
             } catch (error) {
                 console.error("Invalid MQTT Message:", error);
             }
