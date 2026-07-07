@@ -323,10 +323,6 @@ function getHeatColor(value) {
     b = 0;
   }
 
-  chooseInitialImage();
-
-draw();
-
   return { r, g, b, a: 150 };
 }
 
