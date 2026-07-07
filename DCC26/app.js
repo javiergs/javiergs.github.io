@@ -2,9 +2,8 @@ const canvas = document.getElementById("replayCanvas");
 const ctx = canvas.getContext("2d");
 
 const sessionInput = document.getElementById("sessionFile");
-const imageInput = document.getElementById("imageFolder");
 
-
+const IMAGE_BASE_PATH = "images/TEST_dataset_1A/";
 
 const timelineSlider = document.getElementById("timelineSlider");
 const timeLabel = document.getElementById("timeLabel");
@@ -39,7 +38,6 @@ function resetHeatmaps() {
 resetHeatmaps();
 
 sessionInput.addEventListener("change", loadSessionFile);
-imageInput.addEventListener("change", loadImageFolder);
 
 
 viewMode.addEventListener("change", draw);
@@ -76,65 +74,54 @@ async function loadSessionFile(event) {
   draw();
 }
 
-function loadImageFolder(event) {
-  images.clear();
+function getServerImage(filename) {
 
-  let pending = event.target.files.length;
+  if (images.has(filename)) {
 
-  if (pending === 0) {
-    draw();
-    return;
+    return images.get(filename);
+
   }
 
-  for (const file of event.target.files) {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
+  const img = new Image();
 
-    img.onload = () => {
-      pending--;
+  img.onload = () => draw();
 
-      if (pending === 0) {
-        currentImage = null;
-        chooseInitialImage();
-        draw();
-      }
-    };
+  img.onerror = () => {
 
-    img.src = url;
-images.set(file.name, img);
+    console.warn("Could not load image:", filename);
 
-if (file.webkitRelativePath) {
+  };
 
-  const parts = file.webkitRelativePath.split("/");
+  img.src = IMAGE_BASE_PATH + filename;
 
-  images.set(parts[parts.length - 1], img);
+  images.set(filename, img);
+
+  return img;
 
 }
-  }
-
-  statusText.textContent = `Loaded ${images.size} images.`;
-}
-
 function chooseInitialImage() {
-  if (images.size === 0) return;
 
-  const firstStimulus = events.find(event =>
-    event.type === "stimulus" && images.has(event.filename)
-  );
+  if (events.length > 0) {
 
-  if (firstStimulus) {
-    currentImage = images.get(firstStimulus.filename);
-    return;
+    const firstStimulus = events.find(event =>
+
+      event.type === "stimulus"
+
+    );
+
+    if (firstStimulus) {
+
+      currentImage = getServerImage(firstStimulus.filename);
+
+      return;
+
+    }
+
   }
 
-  if (images.has("Slide1.png")) {
-    currentImage = images.get("Slide1.png");
-    return;
-  }
+  currentImage = getServerImage("Slide1.png");
 
-  currentImage = [...images.values()][0] || null;
 }
-
 
 
 
@@ -179,16 +166,15 @@ function updateTimeLabel(index) {
 }
 
 function processEvent(event, shouldDraw = true) {
+if (event.type === "stimulus") {
 
-  if (event.type === "stimulus") {
+  currentImage = getServerImage(event.filename);
 
-    currentImage = images.get(event.filename) || currentImage;
+  currentAffect = null;
 
-    currentAffect = null;
+  resetHeatmaps();
 
-    resetHeatmaps();
-
-  }
+}
 
   if (event.type === "affect") {
 
