@@ -18,35 +18,19 @@
         <input type="file" id="sessionFile" accept=".jsonl,.txt" />
       </label>
 
-<label>
+<section id="viewer">
 
-  Image folder:
+  <canvas id="replayCanvas" width="1512" height="982"></canvas>
 
-  <input type="file" id="imageFolder" webkitdirectory multiple />
+  <div id="playerControls">
 
-</label>
+    <input type="range" id="timelineSlider" min="0" max="0" value="0" />
 
-<label class="timeline">
+    <span id="timeLabel">0.0s</span>
 
-  Time:
+  </div>
 
-  <input
-
-      type="range"
-
-      id="timelineSlider"
-
-      min="0"
-
-      max="0"
-
-      value="0"
-
-  />
-
-</label>
-
-<span id="timeLabel">0.0s</span>
+</section>
 
       <label>
         View:
