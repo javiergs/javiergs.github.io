@@ -100,28 +100,27 @@ function getServerImage(filename) {
 }
 function chooseInitialImage() {
 
-  if (events.length > 0) {
+  if (events.length === 0) {
 
-    const firstStimulus = events.find(event =>
+    currentImage = null;
 
-      event.type === "stimulus"
-
-    );
-
-    if (firstStimulus) {
-
-      currentImage = getServerImage(firstStimulus.filename);
-
-      return;
-
-    }
+    return;
 
   }
 
-  currentImage = getServerImage("Slide1.png");
+  const firstStimulus = events.find(event =>
+
+    event.type === "stimulus"
+
+  );
+
+  if (firstStimulus) {
+
+    currentImage = getServerImage(firstStimulus.filename);
+
+  }
 
 }
-
 
 
 function replayUntil(targetIndex) {
@@ -326,6 +325,3 @@ function getHeatColor(value) {
   return { r, g, b, a: 150 };
 }
 
-chooseInitialImage();
-
-draw();
