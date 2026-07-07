@@ -23,9 +23,19 @@
         <input type="file" id="imageFolder" webkitdirectory multiple />
       </label>
 
-      <button id="playButton">Play</button>
-      <button id="pauseButton">Pause</button>
-      <button id="resetButton">Reset</button>
+<button id="playButton">Play</button>
+
+<button id="pauseButton">Pause</button>
+
+<label class="timeline">
+
+  Time:
+
+  <input type="range" id="timelineSlider" min="0" max="0" value="0" />
+
+</label>
+
+<span id="timeLabel">0.0s</span>
 
       <label>
         View:
