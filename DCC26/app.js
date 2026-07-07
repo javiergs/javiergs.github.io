@@ -66,12 +66,11 @@ async function loadSessionFile(event) {
   timelineSlider.max = Math.max(0, events.length - 1);
   timelineSlider.value = 0;
 
-  resetHeatmaps();
+ resetHeatmaps();
+
+statusText.textContent = `Loaded ${events.length} session events.`;
+
 replayUntil(0);
-
-  statusText.textContent = `Loaded ${events.length} session events.`;
-
-  draw();
 }
 
 function getServerImage(filename) {
@@ -330,3 +329,7 @@ draw();
 
   return { r, g, b, a: 150 };
 }
+
+chooseInitialImage();
+
+draw();
