@@ -15,9 +15,6 @@ let events = [];
 let images = new Map();
 
 let currentIndex = 0;
-let playing = false;
-let timer = null;
-
 let currentImage = null;
 let currentAffect = null;
 
@@ -48,7 +45,6 @@ imageInput.addEventListener("change", loadImageFolder);
 viewMode.addEventListener("change", draw);
 
 timelineSlider.addEventListener("input", () => {
-  pause();
   replayUntil(Number(timelineSlider.value));
 });
 
@@ -105,7 +101,15 @@ function loadImageFolder(event) {
     };
 
     img.src = url;
-    images.set(file.name, img);
+images.set(file.name, img);
+
+if (file.webkitRelativePath) {
+
+  const parts = file.webkitRelativePath.split("/");
+
+  images.set(parts[parts.length - 1], img);
+
+}
   }
 
   statusText.textContent = `Loaded ${images.size} images.`;
