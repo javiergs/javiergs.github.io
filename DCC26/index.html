@@ -18,19 +18,10 @@
         <input type="file" id="sessionFile" accept=".jsonl,.txt" />
       </label>
 
-<section id="viewer">
-
-  <canvas id="replayCanvas" width="1512" height="982"></canvas>
-
-  <div id="playerControls">
-
-    <input type="range" id="timelineSlider" min="0" max="0" value="0" />
-
-    <span id="timeLabel">0.0s</span>
-
-  </div>
-
-</section>
+      <label>
+        Image folder:
+        <input type="file" id="imageFolder" webkitdirectory multiple />
+      </label>
 
       <label>
         View:
@@ -52,9 +43,14 @@
 
     <section id="viewer">
       <canvas id="replayCanvas" width="1512" height="982"></canvas>
+
+      <div id="playerControls">
+        <input type="range" id="timelineSlider" min="0" max="0" value="0" />
+        <span id="timeLabel">0.0s</span>
+      </div>
     </section>
   </main>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
