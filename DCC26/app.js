@@ -3,8 +3,9 @@ const ctx = canvas.getContext("2d");
 
 const sessionInput = document.getElementById("sessionFile");
 const imageInput = document.getElementById("imageFolder");
-const playButton = document.getElementById("playButton");
-const pauseButton = document.getElementById("pauseButton");
+
+
+
 const timelineSlider = document.getElementById("timelineSlider");
 const timeLabel = document.getElementById("timeLabel");
 const viewMode = document.getElementById("viewMode");
@@ -42,8 +43,8 @@ resetHeatmaps();
 
 sessionInput.addEventListener("change", loadSessionFile);
 imageInput.addEventListener("change", loadImageFolder);
-playButton.addEventListener("click", play);
-pauseButton.addEventListener("click", pause);
+
+
 viewMode.addEventListener("change", draw);
 
 timelineSlider.addEventListener("input", () => {
@@ -130,68 +131,37 @@ function chooseInitialImage() {
   currentImage = [...images.values()][0] || null;
 }
 
-function play() {
-  if (events.length === 0) {
-    statusText.textContent = "Load a session file first.";
-    return;
-  }
 
-  playing = true;
-  scheduleNext();
-}
 
-function pause() {
-  playing = false;
-
-  if (timer !== null) {
-    clearTimeout(timer);
-    timer = null;
-  }
-}
-
-function scheduleNext() {
-  if (!playing) return;
-
-  if (currentIndex >= events.length) {
-    pause();
-    statusText.textContent = "Replay finished.";
-    return;
-  }
-
-  const currentEvent = events[currentIndex];
-  const previousEvent =
-    currentIndex > 0 ? events[currentIndex - 1] : currentEvent;
-
-  const delaySeconds = Math.max(0, currentEvent.time - previousEvent.time);
-
-  timer = setTimeout(() => {
-    processEvent(currentEvent, true);
-
-    timelineSlider.value = currentIndex;
-    updateTimeLabel(currentIndex);
-
-    currentIndex++;
-    scheduleNext();
-  }, delaySeconds * 1000);
-}
 
 function replayUntil(targetIndex) {
-  currentIndex = 0;
+
+  currentIndex = targetIndex;
+
   currentImage = null;
+
   currentAffect = null;
 
   resetHeatmaps();
-  chooseInitialImage();
 
   for (let i = 0; i <= targetIndex && i < events.length; i++) {
+
     processEvent(events[i], false);
+
   }
 
-  currentIndex = targetIndex;
+  if (currentImage === null) {
+
+    chooseInitialImage();
+
+  }
+
   timelineSlider.value = targetIndex;
+
   updateTimeLabel(targetIndex);
 
   draw();
+
 }
 
 function updateTimeLabel(index) {
@@ -205,23 +175,35 @@ function updateTimeLabel(index) {
 }
 
 function processEvent(event, shouldDraw = true) {
+
   if (event.type === "stimulus") {
+
     currentImage = images.get(event.filename) || currentImage;
+
     currentAffect = null;
+
     resetHeatmaps();
+
   }
 
   if (event.type === "affect") {
+
     currentAffect = event;
+
   }
 
   if (event.type === "gaze") {
+
     addGaze(event);
+
   }
 
   if (shouldDraw) {
+
     draw();
+
   }
+
 }
 
 function addGaze(event) {
