@@ -5,7 +5,8 @@ const sessionInput = document.getElementById("sessionFile");
 const imageInput = document.getElementById("imageFolder");
 const playButton = document.getElementById("playButton");
 const pauseButton = document.getElementById("pauseButton");
-const resetButton = document.getElementById("resetButton");
+const timelineSlider = document.getElementById("timelineSlider");
+const timeLabel = document.getElementById("timeLabel");
 const viewMode = document.getElementById("viewMode");
 const statusText = document.getElementById("statusText");
 
@@ -43,34 +44,37 @@ sessionInput.addEventListener("change", loadSessionFile);
 imageInput.addEventListener("change", loadImageFolder);
 playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", pause);
-resetButton.addEventListener("click", resetReplay);
 viewMode.addEventListener("change", draw);
+
+timelineSlider.addEventListener("input", () => {
+  pause();
+  replayUntil(Number(timelineSlider.value));
+});
 
 async function loadSessionFile(event) {
   const file = event.target.files[0];
 
-  if (!file) {
-    return;
-  }
+  if (!file) return;
 
   const text = await file.text();
 
   events = text
     .split(/\r?\n/)
     .filter(line => line.trim().length > 0)
-    .map(line => JSON.parse(line));
-
-  events.sort((a, b) => a.time - b.time);
+    .map(line => JSON.parse(line))
+    .sort((a, b) => a.time - b.time);
 
   currentIndex = 0;
   currentImage = null;
   currentAffect = null;
 
+  timelineSlider.max = Math.max(0, events.length - 1);
+  timelineSlider.value = 0;
+
   resetHeatmaps();
   chooseInitialImage();
 
-  statusText.textContent =
-    `Loaded ${events.length} session events.`;
+  statusText.textContent = `Loaded ${events.length} session events.`;
 
   draw();
 }
@@ -78,36 +82,43 @@ async function loadSessionFile(event) {
 function loadImageFolder(event) {
   images.clear();
 
+  let pending = event.target.files.length;
+
+  if (pending === 0) {
+    draw();
+    return;
+  }
+
   for (const file of event.target.files) {
     const url = URL.createObjectURL(file);
     const img = new Image();
 
-    img.onload = () => draw();
-    img.src = url;
+    img.onload = () => {
+      pending--;
 
+      if (pending === 0) {
+        currentImage = null;
+        chooseInitialImage();
+        draw();
+      }
+    };
+
+    img.src = url;
     images.set(file.name, img);
   }
 
-  chooseInitialImage();
-
-  statusText.textContent =
-    `Loaded ${images.size} images.`;
-
-  draw();
+  statusText.textContent = `Loaded ${images.size} images.`;
 }
 
 function chooseInitialImage() {
-  if (currentImage !== null || images.size === 0) {
-    return;
-  }
+  if (images.size === 0) return;
 
-  const stimulusEvent = events.find(event =>
-    event.type === "stimulus" &&
-    images.has(event.filename)
+  const firstStimulus = events.find(event =>
+    event.type === "stimulus" && images.has(event.filename)
   );
 
-  if (stimulusEvent) {
-    currentImage = images.get(stimulusEvent.filename);
+  if (firstStimulus) {
+    currentImage = images.get(firstStimulus.filename);
     return;
   }
 
@@ -116,7 +127,7 @@ function chooseInitialImage() {
     return;
   }
 
-  currentImage = images.values().next().value || null;
+  currentImage = [...images.values()][0] || null;
 }
 
 function play() {
@@ -124,8 +135,6 @@ function play() {
     statusText.textContent = "Load a session file first.";
     return;
   }
-
-  chooseInitialImage();
 
   playing = true;
   scheduleNext();
@@ -140,22 +149,8 @@ function pause() {
   }
 }
 
-function resetReplay() {
-  pause();
-
-  currentIndex = 0;
-  currentImage = null;
-  currentAffect = null;
-
-  resetHeatmaps();
-  chooseInitialImage();
-  draw();
-}
-
 function scheduleNext() {
-  if (!playing) {
-    return;
-  }
+  if (!playing) return;
 
   if (currentIndex >= events.length) {
     pause();
@@ -167,17 +162,49 @@ function scheduleNext() {
   const previousEvent =
     currentIndex > 0 ? events[currentIndex - 1] : currentEvent;
 
-  const delaySeconds =
-    Math.max(0, currentEvent.time - previousEvent.time);
+  const delaySeconds = Math.max(0, currentEvent.time - previousEvent.time);
 
   timer = setTimeout(() => {
-    processEvent(currentEvent);
+    processEvent(currentEvent, true);
+
+    timelineSlider.value = currentIndex;
+    updateTimeLabel(currentIndex);
+
     currentIndex++;
     scheduleNext();
   }, delaySeconds * 1000);
 }
 
-function processEvent(event) {
+function replayUntil(targetIndex) {
+  currentIndex = 0;
+  currentImage = null;
+  currentAffect = null;
+
+  resetHeatmaps();
+  chooseInitialImage();
+
+  for (let i = 0; i <= targetIndex && i < events.length; i++) {
+    processEvent(events[i], false);
+  }
+
+  currentIndex = targetIndex;
+  timelineSlider.value = targetIndex;
+  updateTimeLabel(targetIndex);
+
+  draw();
+}
+
+function updateTimeLabel(index) {
+  if (events.length === 0 || !events[index]) {
+    timeLabel.textContent = "0.0s";
+    return;
+  }
+
+  const elapsed = events[index].time - events[0].time;
+  timeLabel.textContent = `${elapsed.toFixed(1)}s`;
+}
+
+function processEvent(event, shouldDraw = true) {
   if (event.type === "stimulus") {
     currentImage = images.get(event.filename) || currentImage;
     currentAffect = null;
@@ -192,15 +219,15 @@ function processEvent(event) {
     addGaze(event);
   }
 
-  draw();
+  if (shouldDraw) {
+    draw();
+  }
 }
 
 function addGaze(event) {
   addBlob("heatmap", event.x, event.y, 1.0, true);
 
-  if (!currentAffect) {
-    return;
-  }
+  if (!currentAffect) return;
 
   addBlob("focus", event.x, event.y, currentAffect.focus, false);
   addBlob("engagement", event.x, event.y, currentAffect.engagement, false);
@@ -213,15 +240,11 @@ function addGaze(event) {
 function addBlob(mode, gx, gy, weight, accumulate) {
   const map = heatmaps[mode];
 
-  if (!map) {
-    return;
-  }
+  if (!map) return;
 
   weight = Math.max(0, Math.min(1, weight));
 
-  if (weight <= 0) {
-    return;
-  }
+  if (weight <= 0) return;
 
   const centerX = Math.floor(gx * WIDTH);
   const centerY = Math.floor(gy * HEIGHT);
@@ -231,15 +254,11 @@ function addBlob(mode, gx, gy, weight, accumulate) {
       const x = centerX + dx;
       const y = centerY + dy;
 
-      if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) {
-        continue;
-      }
+      if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) continue;
 
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance > RADIUS) {
-        continue;
-      }
+      if (distance > RADIUS) continue;
 
       const spatialWeight = 1.0 - distance / RADIUS;
       const value = spatialWeight * weight;
@@ -269,30 +288,22 @@ function draw() {
 function drawHeatmap(mode) {
   const map = heatmaps[mode];
 
-  if (!map) {
-    return;
-  }
+  if (!map) return;
 
   let max = 0;
 
   for (const value of map) {
-    if (value > max) {
-      max = value;
-    }
+    if (value > max) max = value;
   }
 
-  if (max <= 0) {
-    return;
-  }
+  if (max <= 0) return;
 
   const imageData = ctx.createImageData(WIDTH, HEIGHT);
 
   for (let i = 0; i < map.length; i++) {
     let normalized = map[i] / max;
 
-    if (!Number.isFinite(normalized)) {
-      normalized = 0;
-    }
+    if (!Number.isFinite(normalized)) normalized = 0;
 
     const color = getHeatColor(normalized);
     const p = i * 4;
