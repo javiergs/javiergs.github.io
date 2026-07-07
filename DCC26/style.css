@@ -1,0 +1,55 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #111;
+  color: #eee;
+}
+
+header {
+  padding: 12px 20px;
+  background: #1f1f1f;
+  border-bottom: 1px solid #333;
+}
+
+h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+#controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 20px;
+  background: #181818;
+  border-bottom: 1px solid #333;
+}
+
+button,
+select,
+input {
+  font-size: 14px;
+}
+
+button {
+  padding: 6px 12px;
+}
+
+#status {
+  padding: 8px 20px;
+  color: #bbb;
+}
+
+#viewer {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+}
+
+canvas {
+  max-width: 100%;
+  height: auto;
+  background: black;
+  border: 1px solid #333;
+}
