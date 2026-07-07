@@ -3,7 +3,7 @@ const ctx = canvas.getContext("2d");
 
 const sessionInput = document.getElementById("sessionFile");
 
-const IMAGE_BASE_PATH = "images/TEST_dataset_1A/";
+const IMAGE_BASE_PATH = "images/TEST_dataset_1B/";
 
 const timelineSlider = document.getElementById("timelineSlider");
 const timeLabel = document.getElementById("timeLabel");
