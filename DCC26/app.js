@@ -33,7 +33,7 @@ function resetHeatmaps() {
     excitement: new Float32Array(WIDTH * HEIGHT),
     interest: new Float32Array(WIDTH * HEIGHT),
     relaxation: new Float32Array(WIDTH * HEIGHT),
-    stress: new Float32Array(WIDTH * HEIGHT),
+    stress: new Float32Array(WIDTH * HEIGHT)
   };
 }
 
@@ -41,7 +41,6 @@ resetHeatmaps();
 
 sessionInput.addEventListener("change", loadSessionFile);
 imageInput.addEventListener("change", loadImageFolder);
-
 playButton.addEventListener("click", play);
 pauseButton.addEventListener("click", pause);
 resetButton.addEventListener("click", resetReplay);
@@ -64,7 +63,11 @@ async function loadSessionFile(event) {
   events.sort((a, b) => a.time - b.time);
 
   currentIndex = 0;
+  currentImage = null;
+  currentAffect = null;
+
   resetHeatmaps();
+  chooseInitialImage();
 
   statusText.textContent =
     `Loaded ${events.length} session events.`;
@@ -79,13 +82,41 @@ function loadImageFolder(event) {
     const url = URL.createObjectURL(file);
     const img = new Image();
 
+    img.onload = () => draw();
     img.src = url;
 
     images.set(file.name, img);
   }
 
+  chooseInitialImage();
+
   statusText.textContent =
     `Loaded ${images.size} images.`;
+
+  draw();
+}
+
+function chooseInitialImage() {
+  if (currentImage !== null || images.size === 0) {
+    return;
+  }
+
+  const stimulusEvent = events.find(event =>
+    event.type === "stimulus" &&
+    images.has(event.filename)
+  );
+
+  if (stimulusEvent) {
+    currentImage = images.get(stimulusEvent.filename);
+    return;
+  }
+
+  if (images.has("Slide1.png")) {
+    currentImage = images.get("Slide1.png");
+    return;
+  }
+
+  currentImage = images.values().next().value || null;
 }
 
 function play() {
@@ -93,6 +124,8 @@ function play() {
     statusText.textContent = "Load a session file first.";
     return;
   }
+
+  chooseInitialImage();
 
   playing = true;
   scheduleNext();
@@ -115,6 +148,7 @@ function resetReplay() {
   currentAffect = null;
 
   resetHeatmaps();
+  chooseInitialImage();
   draw();
 }
 
@@ -145,7 +179,7 @@ function scheduleNext() {
 
 function processEvent(event) {
   if (event.type === "stimulus") {
-    currentImage = images.get(event.filename) || null;
+    currentImage = images.get(event.filename) || currentImage;
     currentAffect = null;
     resetHeatmaps();
   }
@@ -269,7 +303,14 @@ function drawHeatmap(mode) {
     imageData.data[p + 3] = color.a;
   }
 
-  ctx.putImageData(imageData, 0, 0);
+  const overlayCanvas = document.createElement("canvas");
+  overlayCanvas.width = WIDTH;
+  overlayCanvas.height = HEIGHT;
+
+  const overlayContext = overlayCanvas.getContext("2d");
+  overlayContext.putImageData(imageData, 0, 0);
+
+  ctx.drawImage(overlayCanvas, 0, 0);
 }
 
 function getHeatColor(value) {
