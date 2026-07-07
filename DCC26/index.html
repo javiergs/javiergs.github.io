@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DCC26 Replay</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>DCC26 Session Replay</h1>
+  </header>
+
+  <main>
+    <section id="controls">
+      <label>
+        Session JSONL:
+        <input type="file" id="sessionFile" accept=".jsonl,.txt" />
+      </label>
+
+      <label>
+        Image folder:
+        <input type="file" id="imageFolder" webkitdirectory multiple />
+      </label>
+
+      <button id="playButton">Play</button>
+      <button id="pauseButton">Pause</button>
+      <button id="resetButton">Reset</button>
+
+      <label>
+        View:
+        <select id="viewMode">
+          <option value="heatmap">Heatmap</option>
+          <option value="focus">Focus</option>
+          <option value="engagement">Engagement</option>
+          <option value="excitement">Excitement</option>
+          <option value="interest">Interest</option>
+          <option value="relaxation">Relaxation</option>
+          <option value="stress">Stress</option>
+        </select>
+      </label>
+    </section>
+
+    <section id="status">
+      <span id="statusText">Load a session file and image folder.</span>
+    </section>
+
+    <section id="viewer">
+      <canvas id="replayCanvas" width="1512" height="982"></canvas>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
