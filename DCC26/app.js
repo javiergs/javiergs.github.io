@@ -67,7 +67,7 @@ async function loadSessionFile(event) {
   timelineSlider.value = 0;
 
   resetHeatmaps();
-  chooseInitialImage();
+replayUntil(0);
 
   statusText.textContent = `Loaded ${events.length} session events.`;
 
@@ -323,6 +323,10 @@ function getHeatColor(value) {
     g = Math.floor(255 * (1 - ratio));
     b = 0;
   }
+
+  chooseInitialImage();
+
+draw();
 
   return { r, g, b, a: 150 };
 }
