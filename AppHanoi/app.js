@@ -952,7 +952,7 @@ function drawMotionSummary(chart) {
     ctx.fillText(card.title, card.x+14, 20);
   }
 
-  // Movement Activity: timeline from raw acceleration residuals.
+  // Movement Activity timeline.
   const m = cards[0];
   const plot = {x:m.x+16, y:48, w:cardW-32, h:95};
   const [t0,t1] = state.domain;
@@ -980,13 +980,21 @@ function drawMotionSummary(chart) {
   if(cursorX>=plot.x && cursorX<=plot.x+plot.w){
     ctx.strokeStyle="#69736c"; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(cursorX,plot.y); ctx.lineTo(cursorX,plot.y+plot.h); ctx.stroke();
+
+    // small current-value point
+    if(currentMove!==null){
+      const py=plot.y+plot.h-(Math.min(currentMove,maxV)/maxV)*plot.h;
+      ctx.fillStyle="#ff9364";
+      ctx.beginPath(); ctx.arc(cursorX,py,4,0,Math.PI*2); ctx.fill();
+    }
   }
+
   ctx.fillStyle="#18211b"; ctx.font="700 13px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
   ctx.fillText(`${movementLabel(currentMove)}${currentMove===null?"":` · ${currentMove.toFixed(3)}`}`,m.x+cardW/2,164);
   ctx.fillStyle="#778078"; ctx.font="10px system-ui";
   ctx.fillText("relative movement activity",m.x+cardW/2,181);
 
-  // Direction: value inside compass to avoid overlap with S.
+  // Direction compass.
   const d=cards[1], cx=d.x+cardW/2, cy=103, radius=Math.min(55,cardW*.22);
   ctx.strokeStyle="#c9cfcc"; ctx.lineWidth=2;
   ctx.beginPath(); ctx.arc(cx,cy,radius,0,Math.PI*2); ctx.stroke();
@@ -1005,33 +1013,135 @@ function drawMotionSummary(chart) {
   ctx.fillStyle="#778078"; ctx.font="10px system-ui";
   ctx.fillText("magnetic heading",cx,181);
 
-  // Screen-relative orientation: face + arrow from participant-specific baseline.
-  const o=cards[2], ocx=o.x+cardW/2, ocy=96;
-  ctx.strokeStyle="#c9cfcc"; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.arc(ocx,ocy,38,0,Math.PI*2); ctx.stroke();
-  // simple face
-  ctx.fillStyle="#69736c";
-  ctx.beginPath(); ctx.arc(ocx-12,ocy-7,2.5,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(ocx+12,ocy-7,2.5,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle="#69736c"; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.arc(ocx,ocy+5,14,0.2*Math.PI,0.8*Math.PI); ctx.stroke();
+  // Cartoon head orientation relative to participant-specific baseline.
+  const o=cards[2], ocx=o.x+cardW/2, ocy=91;
 
   if(orientation){
-    const scale=Math.min(28,orientation.deviation*1.2);
-    const dx=Math.sin(orientation.yawDelta*Math.PI/180)*scale;
-    const dy=Math.sin(orientation.pitchDelta*Math.PI/180)*scale;
-    ctx.strokeStyle="#ff9364"; ctx.lineWidth=4; ctx.lineCap="round";
-    ctx.beginPath(); ctx.moveTo(ocx,ocy); ctx.lineTo(ocx+dx,ocy+dy); ctx.stroke();
+    drawCartoonHead(ctx, ocx, ocy, orientation.yawDelta, orientation.pitchDelta);
 
-    ctx.fillStyle="#18211b"; ctx.font="800 14px system-ui"; ctx.textAlign="center";
-    ctx.fillText(orientation.deviation < 8 ? "Forward" : `${orientation.deviation.toFixed(0)}° away`,ocx,151);
+    const yawText = relativeDirectionText(orientation.yawDelta, "Left", "Right");
+    const pitchText = relativeDirectionText(orientation.pitchDelta, "Up", "Down");
+
+    ctx.fillStyle="#18211b"; ctx.font="800 13px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(yawText,ocx,145);
+    ctx.fillText(pitchText,ocx,163);
+
     ctx.fillStyle="#778078"; ctx.font="10px system-ui";
-    ctx.fillText("from stable screen-facing baseline",ocx,181);
+    ctx.fillText("relative to screen-facing baseline",ocx,184);
   } else {
+    drawCartoonHead(ctx, ocx, ocy, 0, 0);
     ctx.fillStyle="#778078"; ctx.font="11px system-ui"; ctx.textAlign="center";
-    ctx.fillText("No orientation data",ocx,151);
+    ctx.fillText("No orientation data",ocx,154);
   }
 }
+
+function relativeDirectionText(value, negativeLabel, positiveLabel){
+  if(!Number.isFinite(value)) return "—";
+  const degrees=Math.abs(value);
+  if(degrees < 2) return `0° ${negativeLabel}/${positiveLabel}`;
+  return `${degrees.toFixed(0)}° ${value < 0 ? negativeLabel : positiveLabel}`;
+}
+
+function drawCartoonHead(ctx,cx,cy,yawDeg,pitchDeg){
+  const yaw=Math.max(-90,Math.min(90,yawDeg));
+  const pitch=Math.max(-45,Math.min(45,pitchDeg));
+  const yawNorm=yaw/90;
+  const pitchNorm=pitch/45;
+
+  // The face becomes narrower as it turns toward profile.
+  const headW=42*(1-0.42*Math.abs(yawNorm));
+  const headH=48*(1-0.10*Math.abs(pitchNorm));
+
+  ctx.save();
+
+  // Head outline.
+  ctx.strokeStyle="#c9cfcc";
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.ellipse(cx,cy,headW,headH,0,0,Math.PI*2);
+  ctx.stroke();
+
+  // Ear visibility: far ear fades out, near ear remains visible.
+  const leftEarAlpha=Math.max(0.15,1-Math.max(0,yawNorm)*0.85);
+  const rightEarAlpha=Math.max(0.15,1-Math.max(0,-yawNorm)*0.85);
+
+  ctx.globalAlpha=leftEarAlpha;
+  ctx.beginPath();
+  ctx.ellipse(cx-headW-2,cy,5,10,0,0,Math.PI*2);
+  ctx.stroke();
+
+  ctx.globalAlpha=rightEarAlpha;
+  ctx.beginPath();
+  ctx.ellipse(cx+headW+2,cy,5,10,0,0,Math.PI*2);
+  ctx.stroke();
+  ctx.globalAlpha=1;
+
+  // Facial center shifts toward the direction of the turn.
+  const featureShiftX=yawNorm*headW*0.47;
+  const featureShiftY=pitchNorm*headH*0.24;
+  const fcX=cx+featureShiftX;
+  const fcY=cy+featureShiftY;
+
+  // Eyes become closer together as yaw approaches profile.
+  const eyeSeparation=13*(1-0.66*Math.abs(yawNorm));
+  const eyeY=fcY-10;
+
+  // Far eye becomes smaller / disappears near full profile.
+  const nearProfile=Math.abs(yawNorm);
+  const farEyeAlpha=Math.max(0,1-nearProfile*1.25);
+
+  ctx.fillStyle="#69736c";
+
+  // left eye
+  ctx.globalAlpha = yawNorm > 0 ? farEyeAlpha : 1;
+  ctx.beginPath();
+  ctx.ellipse(fcX-eyeSeparation,eyeY,3.0,2.2,0,0,Math.PI*2);
+  ctx.fill();
+
+  // right eye
+  ctx.globalAlpha = yawNorm < 0 ? farEyeAlpha : 1;
+  ctx.beginPath();
+  ctx.ellipse(fcX+eyeSeparation,eyeY,3.0,2.2,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.globalAlpha=1;
+
+  // Pupils add a subtle look direction inside the visible eye(s).
+  const pupilDX=yawNorm*1.4;
+  const pupilDY=pitchNorm*1.2;
+  ctx.fillStyle="#18211b";
+  if(!(yawNorm>0 && farEyeAlpha<0.08)){
+    ctx.beginPath();ctx.arc(fcX-eyeSeparation+pupilDX,eyeY+pupilDY,1.2,0,Math.PI*2);ctx.fill();
+  }
+  if(!(yawNorm<0 && farEyeAlpha<0.08)){
+    ctx.beginPath();ctx.arc(fcX+eyeSeparation+pupilDX,eyeY+pupilDY,1.2,0,Math.PI*2);ctx.fill();
+  }
+
+  // Nose moves strongly toward the face edge. At +/-90° it reaches the oval border.
+  const noseBaseX=fcX;
+  const noseTipX=cx+yawNorm*headW;
+  const noseY=fcY+1;
+  const noseTipY=noseY + pitchNorm*5;
+
+  ctx.strokeStyle="#ff9364";
+  ctx.lineWidth=3;
+  ctx.lineCap="round";
+  ctx.beginPath();
+  ctx.moveTo(noseBaseX,noseY-7);
+  ctx.lineTo(noseTipX,noseTipY);
+  ctx.stroke();
+
+  // Mouth follows the shifted face center.
+  ctx.strokeStyle="#69736c";
+  ctx.lineWidth=2;
+  const mouthHalf=10*(1-0.45*Math.abs(yawNorm));
+  ctx.beginPath();
+  ctx.moveTo(fcX-mouthHalf,fcY+16);
+  ctx.quadraticCurveTo(fcX,fcY+20,fcX+mouthHalf,fcY+16);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 
 function roundRect(ctx,x,y,w,h,r) {
   const rr=Math.min(r,Math.abs(w)/2,Math.abs(h)/2);
