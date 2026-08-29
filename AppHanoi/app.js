@@ -10,10 +10,11 @@ const FILES = {
   trials: "trials.txt"
 };
 
-const COLORS = ["#154734", "#d9a928", "#477b9d", "#a44949", "#735b8f", "#5b7d64"];
+const COLORS = ["#ff9364", "#f2763f", "#f2f2f2", "#b8b8b8", "#d9653a", "#8f8f8f"];
 const MAX_DRAW_POINTS = 4200;
 const EXPERIMENT_PADDING_SECONDS = 60;
 const DISK_COUNT = 6; // The recorded move sequences solve a six-disk Tower of Hanoi.
+const DEFAULT_SMOOTH_SECONDS = 5;
 
 const state = {
   participant: null,
@@ -25,7 +26,9 @@ const state = {
   charts: [],
   playing: false,
   animationFrame: null,
-  lastFrame: null
+  lastFrame: null,
+  chartMode: "raw",       // raw | smooth
+  smoothSeconds: DEFAULT_SMOOTH_SECONDS
 };
 
 const el = id => document.getElementById(id);
@@ -175,6 +178,7 @@ async function loadParticipant(id) {
       motion: normalizeRows("motion", raw.motion)
     };
     buildCharts();
+    refreshChartModeUI();
     updateDomain();
     state.currentTime = state.domain[0];
     el("timeSlider").value = 0;
@@ -280,7 +284,8 @@ function renderHanoi() {
   const board = el("hanoiBoard");
   board.innerHTML = ["A","B","C"].map(peg => {
     const stack = ctx.poles[peg] || [];
-    const disks = stack.map(d => {
+    // Internal stack is [largest ... smallest/top]. Reverse only for display.
+    const disks = [...stack].reverse().map(d => {
       const width = 34 + (d / DISK_COUNT) * 58;
       const pending = ctx.move && peg === ctx.move.From && d === ctx.move.disk ? " pending" : "";
       return `<div class="disk${pending}" style="width:${width}%" title="Disk ${d}">${d}</div>`;
@@ -353,9 +358,118 @@ function buildCharts() {
     { id:"device", title:"Device", note:"Battery percent · overall contact quality", keys:["Battery Percent","Overall Quality"] }
   ];
   el("charts").innerHTML = configs.map(c => `<article class="card chart-card"><div class="chart-title-row"><h2>${c.title}</h2><div class="chart-note">${c.note}</div></div><div class="chart-wrap"><canvas id="chart-${c.id}"></canvas></div><div class="legend" id="legend-${c.id}"></div></article>`).join("");
-  state.charts = configs.map(c => ({ ...c, rows: downsample(state.data[c.id] || []) }));
+  state.charts = configs.map(c => ({
+    ...c,
+    rawRows: state.data[c.id] || [],
+    rows: downsample(state.data[c.id] || []),
+    smoothCacheSeconds: null,
+    smoothRows: null
+  }));
   state.charts.forEach(chart => {
     el(`legend-${chart.id}`).innerHTML = chart.keys.map((k,i) => `<span class="legend-item" style="color:${COLORS[i % COLORS.length]}"><span class="legend-swatch"></span>${escapeHTML(k.replace("Power ",""))}</span>`).join("");
+  });
+}
+
+function lowerBoundTime(rows, target) {
+  let lo = 0, hi = rows.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (rows[mid]._t < target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function upperBoundTime(rows, target) {
+  let lo = 0, hi = rows.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (rows[mid]._t <= target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function buildSmoothedRows(chart, windowSeconds) {
+  const rows = chart.rawRows;
+  if (!rows.length || windowSeconds <= 0) return downsample(rows);
+
+  // Smooth from the full-resolution stream, but only produce enough points to draw.
+  // The window is centered on each displayed sample.
+  const targetCount = Math.min(rows.length, MAX_DRAW_POINTS);
+  const indices = [];
+  if (rows.length <= MAX_DRAW_POINTS) {
+    for (let i = 0; i < rows.length; i++) indices.push(i);
+  } else {
+    const stride = (rows.length - 1) / (targetCount - 1);
+    for (let i = 0; i < targetCount; i++) indices.push(Math.round(i * stride));
+  }
+
+  const prefixes = {};
+  for (const key of chart.keys) {
+    const sums = new Float64Array(rows.length + 1);
+    const counts = new Uint32Array(rows.length + 1);
+
+    for (let i = 0; i < rows.length; i++) {
+      const v = chartValue(chart, rows[i], key);
+      sums[i + 1] = sums[i] + (v === null ? 0 : v);
+      counts[i + 1] = counts[i] + (v === null ? 0 : 1);
+    }
+    prefixes[key] = { sums, counts };
+  }
+
+  const halfWindow = windowSeconds / 2;
+
+  return indices.map(index => {
+    const centerTime = rows[index]._t;
+    const left = lowerBoundTime(rows, centerTime - halfWindow);
+    const right = upperBoundTime(rows, centerTime + halfWindow);
+    const out = { _t: centerTime };
+
+    for (const key of chart.keys) {
+      const { sums, counts } = prefixes[key];
+      const count = counts[right] - counts[left];
+      out[key] = count ? (sums[right] - sums[left]) / count : null;
+    }
+    return out;
+  });
+}
+
+function processedChartRows(chart) {
+  if (state.chartMode !== "smooth") return chart.rows;
+
+  if (chart.smoothCacheSeconds !== state.smoothSeconds || !chart.smoothRows) {
+    chart.smoothRows = buildSmoothedRows(chart, state.smoothSeconds);
+    chart.smoothCacheSeconds = state.smoothSeconds;
+  }
+  return chart.smoothRows;
+}
+
+function refreshChartModeUI() {
+  const smooth = state.chartMode === "smooth";
+  const control = el("smoothWindow");
+  if (control) control.disabled = !smooth;
+
+  state.charts.forEach(chart => {
+    const baseNote = {
+      affect: "Active performance metrics",
+      pad: "Pleasure · Arousal · Dominance",
+      eeg: "AF3 · T7 · Pz · T8 · AF4",
+      face: "Power of current upper/lower facial action",
+      motion: "Accelerometer X · Y · Z",
+      device: "Battery percent · overall contact quality"
+    }[chart.id];
+
+    chart.note = smooth
+      ? `${baseNote} · centered ${state.smoothSeconds}s moving average`
+      : `${baseNote}${chart.id === "eeg" ? " (display downsampled)" : ""}`;
+
+    const canvas = el(`chart-${chart.id}`);
+    if (canvas) {
+      const card = canvas.closest(".chart-card");
+      const note = card ? card.querySelector(".chart-note") : null;
+      if (note) note.textContent = chart.note;
+    }
   });
 }
 
@@ -401,12 +515,12 @@ function computeYDomain(chart, rowsInDomain) {
 
 function drawBackgroundBands(ctx, left, top, width, height, x) {
   ctx.save();
-  ctx.fillStyle = "rgba(74,90,80,.035)";
+  ctx.fillStyle = "rgba(255,255,255,.025)";
   ctx.fillRect(left, top, width, height);
   for (const g of state.trialGroups) {
     const x1 = x(g.start), x2 = x(g.end);
     if (x2 < left || x1 > left+width) continue;
-    ctx.fillStyle = state.currentTime >= g.start && state.currentTime <= g.end ? "rgba(217,169,40,.13)" : "rgba(21,71,52,.07)";
+    ctx.fillStyle = state.currentTime >= g.start && state.currentTime <= g.end ? "rgba(255,147,100,.13)" : "rgba(255,255,255,.045)";
     ctx.fillRect(Math.max(left,x1), top, Math.min(left+width,x2)-Math.max(left,x1), height);
   }
   ctx.restore();
@@ -421,13 +535,14 @@ function drawChart(chart) {
   const pw = w-margin.l-margin.r, ph = h-margin.t-margin.b;
   const [t0,t1] = state.domain;
   const x = t => margin.l + ((t-t0)/(t1-t0))*pw;
-  const domainRows = chart.rows.filter(r => r._t >= t0 && r._t <= t1);
+  const displayRows = processedChartRows(chart);
+  const domainRows = displayRows.filter(r => r._t >= t0 && r._t <= t1);
   const [y0,y1] = computeYDomain(chart, domainRows);
   const y = v => margin.t + (1-(v-y0)/(y1-y0))*ph;
 
   drawBackgroundBands(ctx, margin.l, margin.t, pw, ph, x);
-  ctx.strokeStyle = "#e5e9e6"; ctx.lineWidth = 1;
-  ctx.fillStyle = "#778078"; ctx.font = "11px system-ui"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  ctx.strokeStyle = "#686868"; ctx.lineWidth = 1;
+  ctx.fillStyle = "#a8a8a8"; ctx.font = "11px system-ui"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
   for (let i=0;i<=4;i++) {
     const yy = margin.t + ph*i/4;
     const value = y1-(y1-y0)*i/4;
@@ -456,9 +571,9 @@ function drawChart(chart) {
 
   const cursorX=x(state.currentTime);
   if (cursorX>=margin.l && cursorX<=margin.l+pw) {
-    ctx.strokeStyle="#9b2c2c"; ctx.lineWidth=1.5;
+    ctx.strokeStyle="#ff9364"; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.moveTo(cursorX,margin.t); ctx.lineTo(cursorX,margin.t+ph); ctx.stroke();
-    const nr=nearestRow(state.data[chart.id],state.currentTime);
+    const nr=nearestRow(displayRows,state.currentTime);
     chart.keys.forEach((key,ki)=>{
       const v=nr?chartValue(chart,nr,key):null;
       if(v!==null && v>=y0 && v<=y1){ ctx.fillStyle=COLORS[ki%COLORS.length]; ctx.beginPath(); ctx.arc(cursorX,y(v),3.2,0,Math.PI*2); ctx.fill(); }
@@ -483,19 +598,19 @@ function drawTrialStrip() {
   const {ctx,w,h}=setupCanvas(canvas); ctx.clearRect(0,0,w,h);
   const left=4,right=4,top=6,bottom=10,pw=w-left-right,ph=h-top-bottom;
   const [t0,t1]=state.domain; const x=t=>left+((t-t0)/(t1-t0))*pw;
-  ctx.fillStyle="#eef1ef"; ctx.fillRect(left,top,pw,ph);
+  ctx.fillStyle="#555555"; ctx.fillRect(left,top,pw,ph);
   for(const g of state.trialGroups){
     const x1=Math.max(left,x(g.start)), x2=Math.min(left+pw,x(g.end));
     if(x2<=left||x1>=left+pw) continue;
     const active=state.currentTime>=g.start&&state.currentTime<=g.end;
-    ctx.fillStyle=active?"rgba(217,169,40,.65)":"rgba(21,71,52,.6)"; ctx.fillRect(x1,top,Math.max(2,x2-x1),ph);
-    ctx.fillStyle=active?"#402d00":"#ffffff"; ctx.font="bold 11px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillStyle=active?"rgba(255,147,100,.72)":"rgba(120,120,120,.62)"; ctx.fillRect(x1,top,Math.max(2,x2-x1),ph);
+    ctx.fillStyle=active?"#3f3f3f":"#f5f5f5"; ctx.font="bold 11px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
     if(x2-x1>45) ctx.fillText(`Trial ${g.trial}`,(x1+x2)/2,top+ph/2);
     for(const m of g.moves){
-      if(m._help){ const xx=x(m.start); if(xx>=left&&xx<=left+pw){ ctx.fillStyle="#a63232"; ctx.fillRect(xx,top,2,ph); } }
+      if(m._help){ const xx=x(m.start); if(xx>=left&&xx<=left+pw){ ctx.fillStyle="#f2763f"; ctx.fillRect(xx,top,2,ph); } }
     }
   }
-  const cx=x(state.currentTime); ctx.strokeStyle="#9b2c2c"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,2); ctx.lineTo(cx,h-3); ctx.stroke();
+  const cx=x(state.currentTime); ctx.strokeStyle="#ff9364"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,2); ctx.lineTo(cx,h-3); ctx.stroke();
 }
 
 function updateAll() {
@@ -545,6 +660,23 @@ el("trialStrip").addEventListener("click",event=>{
   const rect=event.currentTarget.getBoundingClientRect(); const f=(event.clientX-rect.left)/rect.width;
   state.currentTime=state.domain[0]+Math.max(0,Math.min(1,f))*(state.domain[1]-state.domain[0]); syncSliderFromTime(); updateAll();
 });
+el("chartMode").addEventListener("change", () => {
+  state.chartMode = el("chartMode").value;
+  refreshChartModeUI();
+  drawAllCharts();
+});
+
+el("smoothWindow").addEventListener("change", () => {
+  state.smoothSeconds = Math.max(0.5, Number(el("smoothWindow").value) || DEFAULT_SMOOTH_SECONDS);
+  // Invalidate cached smoothed data.
+  state.charts.forEach(chart => {
+    chart.smoothCacheSeconds = null;
+    chart.smoothRows = null;
+  });
+  refreshChartModeUI();
+  drawAllCharts();
+});
+
 let resizeTimer=null;
 window.addEventListener("resize",()=>{ clearTimeout(resizeTimer); resizeTimer=setTimeout(()=>{ drawAllCharts(); drawTrialStrip(); },100); });
 

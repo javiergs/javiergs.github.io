@@ -4,10 +4,10 @@
   --ink: #18211b;
   --muted: #667068;
   --line: #dfe5e1;
-  --green: #154734;
+  --green: #ff9364;
   --green-2: #2d6b55;
-  --gold: #d9a928;
-  --danger: #a63232;
+  --gold: #f2763f;
+  --danger: #f2763f;
   --trial: rgba(21, 71, 52, 0.08);
   --active-trial: rgba(217, 169, 40, 0.16);
   --outside: rgba(74, 90, 80, 0.04);
@@ -62,8 +62,9 @@ main { width: min(1500px, calc(100% - 28px)); margin: 18px auto 34px; }
 .clock { margin-top: 2px; font-variant-numeric: tabular-nums; font-size: 1.55rem; font-weight: 760; }
 .elapsed { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
 .controls { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-.speed-label, .view-label { font-size: .78rem; color: var(--muted); display: flex; align-items: center; gap: 5px; }
-.speed-label select, .view-label select { padding: 7px 8px; }
+.speed-label, .view-label, .chart-mode-label, .smooth-label { font-size: .78rem; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.speed-label select, .view-label select, .chart-mode-label select, .smooth-label select { padding: 7px 8px; }
+.smooth-label select:disabled { opacity: .45; }
 .time-slider { width: 100%; margin: 14px 0 0; accent-color: var(--green); }
 .range-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: .74rem; font-variant-numeric: tabular-nums; }
 .trial-strip { width: 100%; height: 48px; display: block; margin-top: 3px; cursor: pointer; }
