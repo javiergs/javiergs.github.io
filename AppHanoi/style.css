@@ -180,8 +180,8 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
 .quality-chip.q0 { background: #969b98; }
 .quality-chip.q1 { background: #d32f2f; }
 .quality-chip.q2 { background: #f57c00; }
-.quality-chip.q3 { background: #8fca72; }
-.quality-chip.q4 { background: #176b3a; }
+.quality-chip.q3 { background: #9bd47f; }
+.quality-chip.q4 { background: #0f5f32; }
 
 
 /* Three compact human-readable motion cards in one row */
@@ -190,4 +190,4 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
 }
 
 
-.wireless-status-wrap { height: 115px; }
+.wireless-status-wrap { height: 145px; }

@@ -353,14 +353,20 @@ function renderSnapshot() {
   const m = nearestRow(state.data.motion, state.currentTime);
   const d = nearestRow(state.data.device, state.currentTime);
   const groups = [
-    ["Affect", [["Focus",snapshotValue(a,"Focus")],["Engagement",snapshotValue(a,"Engagement")],["Interest",snapshotValue(a,"Interest")],["Stress",snapshotValue(a,"Stress")]]],
+    ["Affect", [["Attention",snapshotValue(a,"Focus")],["Engagement",snapshotValue(a,"Engagement")],["Interest",snapshotValue(a,"Interest")],["Stress",snapshotValue(a,"Stress")]]],
     ["PAD", [["Pleasure",snapshotValue(p,"Pleasure")],["Arousal",snapshotValue(p,"Arousal")],["Dominance",snapshotValue(p,"Dominance")]]],
     ["EEG", [["AF3",snapshotValue(e,"AF3",1)],["T7",snapshotValue(e,"T7",1)],["Pz",snapshotValue(e,"Pz",1)],["T8",snapshotValue(e,"T8",1)],["AF4",snapshotValue(e,"AF4",1)]]],
     ["Face", [["Eye",snapshotValue(f,"Action Eye",0)],["Upper",snapshotValue(f,"Action Upper Face",0)],["Upper power",snapshotValue(f,"Power Upper Face")],["Lower",snapshotValue(f,"Action Lower Face",0)],["Lower power",snapshotValue(f,"Power Lower Face")]]],
     ["Motion", [["Movement",movementSnapshotValue(state.data.motion,state.currentTime)],["Heading",magneticHeadingLabel(m)],["Tilt",tiltSnapshotValue(m)]]],
-    ["Device", [["Battery", `${snapshotValue(d,"Battery Percent",0)}%`],["Wireless",snapshotValue(d,"Wireless Signal",0)],["Sensor 0",snapshotValue(d,"Quality Sensor 0",0)],["Sensor 1",snapshotValue(d,"Quality Sensor 1",0)],["Sensor 2",snapshotValue(d,"Quality Sensor 2",0)],["Sensor 3",snapshotValue(d,"Quality Sensor 3",0)],["Sensor 4",snapshotValue(d,"Quality Sensor 4",0)]]]
+    ["Device", [["Battery", `${snapshotValue(d,"Battery Percent",0)}%`],["Wireless",wirelessSnapshotValue(d)],["AF3 CQ",snapshotValue(d,"Quality Sensor 0",0)],["T7 CQ",snapshotValue(d,"Quality Sensor 1",0)],["Pz CQ",snapshotValue(d,"Quality Sensor 2",0)],["T8 CQ",snapshotValue(d,"Quality Sensor 3",0)],["AF4 CQ",snapshotValue(d,"Quality Sensor 4",0)]]]
   ];
-  el("snapshot").innerHTML = groups.map(([name, rows]) => `<div class="snapshot-group"><h3>${name}</h3>${rows.map(([k,v]) => `<div class="snapshot-row"><span>${escapeHTML(displaySeriesLabel(chart,k))}</span><strong>${escapeHTML(v)}</strong></div>`).join("")}</div>`).join("");
+  el("snapshot").innerHTML = groups.map(([name, rows]) => `<div class="snapshot-group"><h3>${name}</h3>${rows.map(([k,v]) => `<div class="snapshot-row"><span>${escapeHTML(k)}</span><strong>${escapeHTML(v)}</strong></div>`).join("")}</div>`).join("");
+}
+
+function wirelessSnapshotValue(row) {
+  if (!row) return "—";
+  const value = asNumber(row["Wireless Signal"]);
+  return value === null ? "—" : `${wirelessLabel(value)} (${value.toFixed(2)})`;
 }
 
 function displaySeriesLabel(chart, key) {
@@ -425,7 +431,7 @@ function buildCharts() {
     },
     {
       id:"wireless", source:"device", type:"wirelessStatus", title:"Device · Wireless Signal",
-      note:"EMOTIV wireless signal range 0–1 · 1 is best",
+      note:"EMOTIV wireless signal 0–1 · green = 1 · orange = reduced · red = low · gray = 0",
       keys:["Wireless Signal"],
       noSmooth:true
     }
@@ -1134,27 +1140,79 @@ function drawHeadingChart(chart) {
 }
 
 
+function wirelessColor(value){
+  if(value === null || !Number.isFinite(value)) return "#969b98";
+  if(value >= 0.999) return "#176b3a";
+  if(value <= 0) return "#969b98";
+  if(value <= 1/3) return "#d32f2f";
+  return "#f57c00";
+}
+
+function wirelessLabel(value){
+  if(value === null || !Number.isFinite(value)) return "No data";
+  if(value >= 0.999) return "Good";
+  if(value <= 0) return "No signal";
+  if(value <= 1/3) return "Poor";
+  return "Reduced";
+}
+
 function drawWirelessStatus(chart){
   const canvas=el(`chart-${chart.id}`);
   if(!canvas) return;
   const {ctx,w,h}=setupCanvas(canvas);
   ctx.clearRect(0,0,w,h);
-  const row=nearestRow(chart.rawRows,state.currentTime);
-  const value=row?asNumber(row["Wireless Signal"]):null;
-  const good=value!==null && value>=0.75;
-  const partial=value!==null && value>0 && value<0.75;
-  const label=value===null?"No data":good?"Good":partial?"Weak":"No signal";
-  const cx=w/2,cy=h/2-4;
-  ctx.fillStyle=value===null?"#969b98":good?"#1f8a4c":partial?"#f57c00":"#d32f2f";
-  ctx.beginPath();ctx.arc(cx-56,cy,8,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle="#18211b";ctx.font="800 25px system-ui";ctx.textAlign="left";ctx.textBaseline="middle";
-  ctx.fillText(label,cx-38,cy);
-  ctx.fillStyle="#778078";ctx.font="12px system-ui";
-  ctx.fillText(value===null?"":`Signal ${value.toFixed(2)} / 1`,cx-38,cy+30);
+
+  const margin={l:54,r:15,t:22,b:31};
+  const pw=w-margin.l-margin.r;
+  const barY=margin.t+22;
+  const barH=Math.max(22,h-margin.t-margin.b-38);
+  const [t0,t1]=state.domain;
+  const x=t=>margin.l+((t-t0)/(t1-t0))*pw;
+
+  drawBackgroundBands(ctx,margin.l,barY,pw,barH,x);
+
+  const rows=chart.rawRows.filter(r=>r._t>=t0-2 && r._t<=t1+2);
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i];
+    const nextT=i+1<rows.length?rows[i+1]._t:row._t+0.5;
+    const x1=Math.max(margin.l,x(row._t));
+    const x2=Math.min(margin.l+pw,x(nextT));
+    if(x2<=x1) continue;
+    const value=asNumber(row["Wireless Signal"]);
+    ctx.fillStyle=wirelessColor(value);
+    ctx.fillRect(x1,barY,Math.max(1,x2-x1+0.5),barH);
+  }
+
+  ctx.strokeStyle="#c9cfcc";ctx.lineWidth=1;
+  ctx.strokeRect(margin.l,barY,pw,barH);
+
+  const current=nearestRow(chart.rawRows,state.currentTime);
+  const value=current?asNumber(current["Wireless Signal"]):null;
+  ctx.fillStyle=wirelessColor(value);
+  ctx.beginPath();ctx.arc(margin.l+8,14,5,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#18211b";ctx.font="700 12px system-ui";ctx.textAlign="left";ctx.textBaseline="middle";
+  ctx.fillText(`${wirelessLabel(value)}${value===null?"":` · ${value.toFixed(2)}`}`,margin.l+18,14);
+
+  ctx.fillStyle="#a8a8a8";ctx.font="11px system-ui";ctx.textAlign="center";ctx.textBaseline="top";
+  for(let i=0;i<=4;i++){
+    const xx=margin.l+pw*i/4;
+    const tt=t0+(t1-t0)*i/4;
+    ctx.fillText(formatClockShort(tt),xx,barY+barH+7);
+  }
+
+  const cursorX=x(state.currentTime);
+  if(cursorX>=margin.l && cursorX<=margin.l+pw){
+    ctx.strokeStyle="#ff9364";ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(cursorX,barY-5);ctx.lineTo(cursorX,barY+barH+5);ctx.stroke();
+    // current-position box around the bar segment
+    ctx.strokeStyle="#18211b";ctx.lineWidth=2;
+    ctx.strokeRect(cursorX-4,barY-3,8,barH+6);
+  }
 }
 
+
 function qualityColor(value) {
-  const colors = ["#969b98","#d32f2f","#f57c00","#8fca72","#176b3a"];
+  const colors = ["#969b98","#d32f2f","#f57c00","#9bd47f","#0f5f32"];
   const i = Math.max(0, Math.min(4, Math.round(value)));
   return colors[i];
 }
