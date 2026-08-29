@@ -132,3 +132,27 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
 
 .face-chart-wrap { height: 190px; }
 .face-swatch { height: 8px; width: 12px; border-radius: 2px; }
+
+
+/* Signal selection */
+.selectable-legend { gap: 8px 14px; }
+.series-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+}
+.series-check input {
+  margin: 0 2px 0 0;
+  accent-color: currentColor;
+}
+
+/* Approximate heading visualization */
+.heading-chart-wrap { height: 220px; }
+
+/* Discrete quality charts should be compact. */
+.chart-card:has(canvas[id^="chart-wireless"]) .chart-wrap,
+.chart-card:has(canvas[id^="chart-deviceQuality"]) .chart-wrap {
+  height: 180px;
+}

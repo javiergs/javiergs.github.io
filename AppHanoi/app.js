@@ -13,14 +13,17 @@ const FILES = {
 const COLORS = ["#154734", "#d9a928", "#477b9d", "#a44949", "#735b8f", "#5b7d64"];
 const DISK_COLORS = ["#ff9364", "#477b9d", "#d9a928", "#735b8f", "#5b7d64", "#a44949"];
 const FACE_ACTION_COLORS = {
-  neutral: "#8f9691",
-  blink: "#477b9d",
-  frown: "#a44949",
-  surprise: "#735b8f",
-  smile: "#4f8a68",
-  laugh: "#d9a928",
-  winkl: "#2f7f83",
-  winkr: "#b56b32"
+  neutral: "#9ca3a0",
+  blink: "#0066ff",
+  winkl: "#00a9a5",
+  winkr: "#7a4cff",
+  lookl: "#00c853",
+  lookr: "#ff1744",
+  frown: "#d84315",
+  surprise: "#8e24aa",
+  smile: "#00bfa5",
+  laugh: "#ffb300",
+  smirkright: "#e91e63"
 };
 const MAX_DRAW_POINTS = 4200;
 const EXPERIMENT_PADDING_SECONDS = 60;
@@ -39,7 +42,8 @@ const state = {
   animationFrame: null,
   lastFrame: null,
   chartMode: "raw",       // raw | smooth
-  smoothSeconds: DEFAULT_SMOOTH_SECONDS
+  smoothSeconds: DEFAULT_SMOOTH_SECONDS,
+  visibleSeries: {}
 };
 
 const el = id => document.getElementById(id);
@@ -353,8 +357,8 @@ function renderSnapshot() {
     ["PAD", [["Pleasure",snapshotValue(p,"Pleasure")],["Arousal",snapshotValue(p,"Arousal")],["Dominance",snapshotValue(p,"Dominance")]]],
     ["EEG", [["AF3",snapshotValue(e,"AF3",1)],["T7",snapshotValue(e,"T7",1)],["Pz",snapshotValue(e,"Pz",1)],["T8",snapshotValue(e,"T8",1)],["AF4",snapshotValue(e,"AF4",1)]]],
     ["Face", [["Eye",snapshotValue(f,"Action Eye",0)],["Upper",snapshotValue(f,"Action Upper Face",0)],["Upper power",snapshotValue(f,"Power Upper Face")],["Lower",snapshotValue(f,"Action Lower Face",0)],["Lower power",snapshotValue(f,"Power Lower Face")]]],
-    ["Motion", [["Accel X",snapshotValue(m,"Accelerometer X",3)],["Accel Y",snapshotValue(m,"Accelerometer Y",3)],["Accel Z",snapshotValue(m,"Accelerometer Z",3)]]],
-    ["Device", [["Battery", `${snapshotValue(d,"Battery Percent",0)}%`],["Overall",snapshotValue(d,"Overall Quality",0)],["Wireless",snapshotValue(d,"Wireless Signal",0)],["Sensor 0",snapshotValue(d,"Quality Sensor 0",0)],["Sensor 1",snapshotValue(d,"Quality Sensor 1",0)],["Sensor 2",snapshotValue(d,"Quality Sensor 2",0)],["Sensor 3",snapshotValue(d,"Quality Sensor 3",0)],["Sensor 4",snapshotValue(d,"Quality Sensor 4",0)]]]
+    ["Motion", [["Accel X",snapshotValue(m,"Accelerometer X",3)],["Accel Y",snapshotValue(m,"Accelerometer Y",3)],["Accel Z",snapshotValue(m,"Accelerometer Z",3)],["Heading",magneticHeadingLabel(m)]]],
+    ["Device", [["Battery", `${snapshotValue(d,"Battery Percent",0)}%`],["Wireless",snapshotValue(d,"Wireless Signal",0)],["Sensor 0",snapshotValue(d,"Quality Sensor 0",0)],["Sensor 1",snapshotValue(d,"Quality Sensor 1",0)],["Sensor 2",snapshotValue(d,"Quality Sensor 2",0)],["Sensor 3",snapshotValue(d,"Quality Sensor 3",0)],["Sensor 4",snapshotValue(d,"Quality Sensor 4",0)]]]
   ];
   el("snapshot").innerHTML = groups.map(([name, rows]) => `<div class="snapshot-group"><h3>${name}</h3>${rows.map(([k,v]) => `<div class="snapshot-row"><span>${escapeHTML(k)}</span><strong>${escapeHTML(v)}</strong></div>`).join("")}</div>`).join("");
 }
@@ -365,18 +369,21 @@ function buildCharts() {
       id:"affect", source:"affect", title:"Affect",
       note:"Active performance metrics only · −1 treated as missing",
       keys:["Focus","Engagement","Excitement","Interest","Relaxation","Stress"],
-      activePrefix:"Active ", yDomain:[0,1], yTicks:[0,.25,.5,.75,1]
+      activePrefix:"Active ", yDomain:[0,1], yTicks:[0,.25,.5,.75,1],
+      selectable:true
     },
     {
       id:"pad", source:"pad", title:"PAD",
       note:"Pleasure · Arousal · Dominance",
       keys:["Pleasure","Arousal","Dominance"],
-      yDomain:[-1,1], yTicks:[-1,-.5,0,.5,1]
+      yDomain:[-1,1], yTicks:[-1,-.5,0,.5,1],
+      selectable:true
     },
     {
       id:"eeg", source:"eeg", title:"EEG",
       note:"AF3 · T7 · Pz · T8 · AF4 (display downsampled)",
-      keys:["AF3","T7","Pz","T8","AF4"]
+      keys:["AF3","T7","Pz","T8","AF4"],
+      selectable:true
     },
     {
       id:"face", source:"face", type:"face", title:"Facial Actions",
@@ -384,34 +391,50 @@ function buildCharts() {
       keys:[]
     },
     {
-      id:"motion", source:"motion", title:"Motion",
+      id:"motion", source:"motion", title:"Motion · Accelerometer",
       note:"Accelerometer X · Y · Z",
       keys:["Accelerometer X","Accelerometer Y","Accelerometer Z"]
     },
     {
-      id:"deviceOverview", source:"device", title:"Device · Battery / Overall",
-      note:"Battery Percent · Overall Quality",
-      keys:["Battery Percent","Overall Quality"],
+      id:"heading", source:"motion", type:"heading", title:"Head Direction",
+      note:"Approximate magnetic heading from Magnetometer X/Y · not quaternion-derived",
+      keys:[]
+    },
+    {
+      id:"battery", source:"device", title:"Device · Battery",
+      note:"Battery Percent",
+      keys:["Battery Percent"],
       yDomain:[0,100], yTicks:[0,25,50,75,100]
     },
     {
-      id:"deviceQuality", source:"device", title:"Device · Signal / Sensor Quality",
-      note:"Wireless Signal · Quality Sensors 0–4",
-      keys:["Wireless Signal","Quality Sensor 0","Quality Sensor 1","Quality Sensor 2","Quality Sensor 3","Quality Sensor 4"],
-      yDomain:[0,4], yTicks:[0,1,2,3,4]
+      id:"wireless", source:"device", type:"qualityBars", title:"Device · Wireless Signal",
+      note:"Discrete values · no smoothing",
+      keys:["Wireless Signal"],
+      yDomain:[0,4], yTicks:[0,1,2,3,4],
+      noSmooth:true
+    },
+    {
+      id:"deviceQuality", source:"device", type:"qualityBars", title:"Device · Sensor Quality",
+      note:"Discrete sensor quality values 0–4 · no smoothing",
+      keys:["Quality Sensor 0","Quality Sensor 1","Quality Sensor 2","Quality Sensor 3","Quality Sensor 4"],
+      yDomain:[0,4], yTicks:[0,1,2,3,4],
+      noSmooth:true
     }
   ];
 
   el("charts").innerHTML = configs.map(c =>
     `<article class="card chart-card">
       <div class="chart-title-row"><h2>${c.title}</h2><div class="chart-note">${c.note}</div></div>
-      <div class="chart-wrap${c.type === "face" ? " face-chart-wrap" : ""}"><canvas id="chart-${c.id}"></canvas></div>
-      <div class="legend" id="legend-${c.id}"></div>
+      <div class="chart-wrap${c.type === "face" ? " face-chart-wrap" : c.type === "heading" ? " heading-chart-wrap" : ""}"><canvas id="chart-${c.id}"></canvas></div>
+      <div class="legend${c.selectable ? " selectable-legend" : ""}" id="legend-${c.id}"></div>
     </article>`
   ).join("");
 
   state.charts = configs.map(c => {
     const rawRows = state.data[c.source] || [];
+    if (!(c.id in state.visibleSeries)) {
+      state.visibleSeries[c.id] = Object.fromEntries(c.keys.map(k => [k, true]));
+    }
     return {
       ...c,
       rawRows,
@@ -422,6 +445,7 @@ function buildCharts() {
   });
 
   state.charts.forEach(chart => {
+    const legend = el(`legend-${chart.id}`);
     if (chart.type === "face") {
       const actions = new Set();
       for (const row of chart.rawRows) {
@@ -430,15 +454,39 @@ function buildCharts() {
           if (action) actions.add(action);
         });
       }
-      el(`legend-${chart.id}`).innerHTML = [...actions].sort().map(action =>
+      legend.innerHTML = [...actions].sort().map(action =>
         `<span class="legend-item" style="color:${faceActionColor(action)}"><span class="legend-swatch face-swatch"></span>${escapeHTML(action)}</span>`
       ).join("");
+    } else if (chart.type === "heading") {
+      legend.innerHTML = `<span class="legend-item">N / E / S / W indicate magnetic heading only</span>`;
+    } else if (chart.selectable) {
+      legend.innerHTML = chart.keys.map((k,i) =>
+        `<label class="series-check" style="color:${COLORS[i % COLORS.length]}">
+          <input type="checkbox" data-chart="${chart.id}" data-key="${escapeHTML(k)}" ${state.visibleSeries[chart.id][k] !== false ? "checked" : ""}>
+          <span class="legend-swatch"></span>${escapeHTML(k)}
+        </label>`
+      ).join("");
     } else {
-      el(`legend-${chart.id}`).innerHTML = chart.keys.map((k,i) =>
-        `<span class="legend-item" style="color:${COLORS[i % COLORS.length]}"><span class="legend-swatch"></span>${escapeHTML(k.replace("Power ",""))}</span>`
+      legend.innerHTML = chart.keys.map((k,i) =>
+        `<span class="legend-item" style="color:${COLORS[i % COLORS.length]}"><span class="legend-swatch"></span>${escapeHTML(k)}</span>`
       ).join("");
     }
   });
+
+  document.querySelectorAll(".series-check input").forEach(input => {
+    input.addEventListener("change", event => {
+      const chartId = event.currentTarget.dataset.chart;
+      const key = event.currentTarget.dataset.key;
+      state.visibleSeries[chartId][key] = event.currentTarget.checked;
+      drawAllCharts();
+    });
+  });
+}
+
+function visibleChartKeys(chart) {
+  if (!chart.selectable) return chart.keys;
+  const visibility = state.visibleSeries[chart.id] || {};
+  return chart.keys.filter(key => visibility[key] !== false);
 }
 
 function lowerBoundTime(rows, target) {
@@ -507,7 +555,7 @@ function buildSmoothedRows(chart, windowSeconds) {
 }
 
 function processedChartRows(chart) {
-  if (chart.type === "face" || state.chartMode !== "smooth") return chart.rows;
+  if (chart.type === "face" || chart.type === "heading" || chart.noSmooth || state.chartMode !== "smooth") return chart.rows;
 
   if (chart.smoothCacheSeconds !== state.smoothSeconds || !chart.smoothRows) {
     chart.smoothRows = buildSmoothedRows(chart, state.smoothSeconds);
@@ -533,14 +581,21 @@ function refreshChartModeUI() {
       note.textContent = "Action category by color · upper/lower power by intensity";
       return;
     }
+    if (chart.type === "heading") {
+      note.textContent = "Approximate magnetic heading from Magnetometer X/Y · not quaternion-derived";
+      return;
+    }
+    if (chart.noSmooth) {
+      note.textContent = chart.note;
+      return;
+    }
 
     const base = {
       affect: "Active performance metrics only · −1 treated as missing",
       pad: "Pleasure · Arousal · Dominance",
       eeg: "AF3 · T7 · Pz · T8 · AF4",
       motion: "Accelerometer X · Y · Z",
-      deviceOverview: "Battery Percent · Overall Quality",
-      deviceQuality: "Wireless Signal · Quality Sensors 0–4"
+      battery: "Battery Percent"
     }[chart.id] || chart.note;
 
     note.textContent = smooth
@@ -578,7 +633,8 @@ function computeYDomain(chart, rowsInDomain) {
   if (chart.yDomain) return chart.yDomain;
 
   const values = [];
-  for (const r of rowsInDomain) for (const key of chart.keys) {
+  const keys = visibleChartKeys(chart);
+  for (const r of rowsInDomain) for (const key of keys) {
     const v = chartValue(chart, r, key);
     if (v !== null) values.push(v);
   }
@@ -597,12 +653,30 @@ function computeYDomain(chart, rowsInDomain) {
 
 function drawBackgroundBands(ctx, left, top, width, height, x) {
   ctx.save();
+
+  // General outside-trial background.
   ctx.fillStyle = "rgba(255,255,255,.025)";
   ctx.fillRect(left, top, width, height);
+
+  // Make gaps between trials visually obvious.
+  for (let i = 0; i < state.trialGroups.length - 1; i++) {
+    const gapStart = state.trialGroups[i].end;
+    const gapEnd = state.trialGroups[i + 1].start;
+    const gx1 = Math.max(left, x(gapStart));
+    const gx2 = Math.min(left + width, x(gapEnd));
+    if (gx2 > gx1) {
+      ctx.fillStyle = "rgba(135,145,140,.16)";
+      ctx.fillRect(gx1, top, gx2 - gx1, height);
+    }
+  }
+
+  // Trial regions.
   for (const g of state.trialGroups) {
     const x1 = x(g.start), x2 = x(g.end);
     if (x2 < left || x1 > left+width) continue;
-    ctx.fillStyle = state.currentTime >= g.start && state.currentTime <= g.end ? "rgba(255,147,100,.13)" : "rgba(255,255,255,.045)";
+    ctx.fillStyle = state.currentTime >= g.start && state.currentTime <= g.end
+      ? "rgba(255,147,100,.13)"
+      : "rgba(255,255,255,.045)";
     ctx.fillRect(Math.max(left,x1), top, Math.min(left+width,x2)-Math.max(left,x1), height);
   }
   ctx.restore();
@@ -713,8 +787,166 @@ function drawFaceChart(chart) {
   }
 }
 
+
+function magneticHeading(row) {
+  if (!row) return null;
+  const mx = asNumber(row["Magnetometer X"]);
+  const my = asNumber(row["Magnetometer Y"]);
+  if (mx === null || my === null) return null;
+  let deg = Math.atan2(my, mx) * 180 / Math.PI;
+  deg = (deg + 360) % 360;
+  return deg;
+}
+
+function compassDirection(deg) {
+  if (!Number.isFinite(deg)) return "—";
+  const dirs = ["N","NE","E","SE","S","SW","W","NW"];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
+function magneticHeadingLabel(row) {
+  const deg = magneticHeading(row);
+  return deg === null ? "—" : `${compassDirection(deg)} ${deg.toFixed(0)}°`;
+}
+
+function drawHeadingChart(chart) {
+  const canvas = el(`chart-${chart.id}`);
+  if (!canvas) return;
+  const {ctx,w,h} = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+
+  const row = nearestRow(chart.rawRows, state.currentTime);
+  const heading = magneticHeading(row);
+
+  const cx = w / 2, cy = h / 2;
+  const radius = Math.min(w, h) * 0.34;
+
+  ctx.strokeStyle = "#c9cfcc";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI*2);
+  ctx.stroke();
+
+  ctx.font = "700 13px system-ui";
+  ctx.fillStyle = "#626a66";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("N", cx, cy-radius-14);
+  ctx.fillText("S", cx, cy+radius+14);
+  ctx.fillText("W", cx-radius-16, cy);
+  ctx.fillText("E", cx+radius+16, cy);
+
+  if (heading !== null) {
+    // atan2(my,mx): 0° at +X. Rotate visualization so 0° displays at North.
+    const angle = (heading - 90) * Math.PI / 180;
+    const ex = cx + Math.cos(angle) * radius * .78;
+    const ey = cy + Math.sin(angle) * radius * .78;
+
+    ctx.strokeStyle = "#ff9364";
+    ctx.fillStyle = "#ff9364";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(ex,ey);
+    ctx.stroke();
+
+    // arrow head
+    ctx.save();
+    ctx.translate(ex,ey);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(8,0);
+    ctx.lineTo(-7,-6);
+    ctx.lineTo(-7,6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = "#18211b";
+    ctx.font = "750 18px system-ui";
+    ctx.fillText(`${compassDirection(heading)} · ${heading.toFixed(0)}°`, cx, cy);
+  } else {
+    ctx.fillStyle = "#667068";
+    ctx.fillText("No heading data", cx, cy);
+  }
+}
+
+function qualityColor(value) {
+  const colors = ["#b23a2b","#e26d2f","#e2b93b","#6ca965","#237a57"];
+  const i = Math.max(0, Math.min(4, Math.round(value)));
+  return colors[i];
+}
+
+function drawQualityBars(chart) {
+  const canvas = el(`chart-${chart.id}`);
+  if (!canvas) return;
+  const {ctx,w,h} = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+
+  const margin = {l:52,r:15,t:12,b:26};
+  const pw = w-margin.l-margin.r, ph = h-margin.t-margin.b;
+  const [t0,t1] = state.domain;
+  const x = t => margin.l + ((t-t0)/(t1-t0))*pw;
+  const y = v => margin.t + ph - (Math.max(0, Math.min(4, v))/4)*ph;
+
+  drawBackgroundBands(ctx, margin.l, margin.t, pw, ph, x);
+
+  ctx.strokeStyle = "#d7dcda";
+  ctx.fillStyle = "#778078";
+  ctx.font = "11px system-ui";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  for (let value=0; value<=4; value++) {
+    const yy = y(value);
+    ctx.beginPath();
+    ctx.moveTo(margin.l,yy);
+    ctx.lineTo(margin.l+pw,yy);
+    ctx.stroke();
+    ctx.fillText(String(value), margin.l-7, yy);
+  }
+
+  const rows = chart.rows.filter(r => r._t >= t0 && r._t <= t1);
+  const keys = chart.keys;
+  const groupWidth = Math.max(1, pw / Math.max(rows.length, 1));
+  const barWidth = Math.max(1, Math.min(5, groupWidth / Math.max(keys.length,1)));
+
+  rows.forEach(row => {
+    const baseX = x(row._t);
+    keys.forEach((key,ki) => {
+      const v = asNumber(row[key]);
+      if (v === null) return;
+      const yy = y(v);
+      ctx.fillStyle = qualityColor(v);
+      const offset = (ki - (keys.length-1)/2) * barWidth;
+      ctx.fillRect(baseX + offset, yy, barWidth, margin.t + ph - yy);
+    });
+  });
+
+  ctx.fillStyle = "#778078";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  for (let i=0;i<=4;i++) {
+    const xx = margin.l + pw*i/4;
+    const tt = t0 + (t1-t0)*i/4;
+    ctx.fillText(formatClockShort(tt), xx, margin.t+ph+6);
+  }
+
+  const cursorX = x(state.currentTime);
+  if (cursorX >= margin.l && cursorX <= margin.l + pw) {
+    ctx.strokeStyle = "#ff9364";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cursorX, margin.t);
+    ctx.lineTo(cursorX, margin.t+ph);
+    ctx.stroke();
+  }
+}
+
 function drawChart(chart) {
   if (chart.type === "face") { drawFaceChart(chart); return; }
+  if (chart.type === "heading") { drawHeadingChart(chart); return; }
+  if (chart.type === "qualityBars") { drawQualityBars(chart); return; }
   const canvas = el(`chart-${chart.id}`);
   if (!canvas) return;
   const {ctx,w,h} = setupCanvas(canvas);
@@ -724,6 +956,7 @@ function drawChart(chart) {
   const [t0,t1] = state.domain;
   const x = t => margin.l + ((t-t0)/(t1-t0))*pw;
   const displayRows = processedChartRows(chart);
+  const keys = visibleChartKeys(chart);
   const domainRows = displayRows.filter(r => r._t >= t0 && r._t <= t1);
   const [y0,y1] = computeYDomain(chart, domainRows);
   const y = v => margin.t + (1-(v-y0)/(y1-y0))*ph;
@@ -762,7 +995,7 @@ function drawChart(chart) {
     ctx.strokeStyle="#ff9364"; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.moveTo(cursorX,margin.t); ctx.lineTo(cursorX,margin.t+ph); ctx.stroke();
     const nr=nearestRow(displayRows,state.currentTime);
-    chart.keys.forEach((key,ki)=>{
+    keys.forEach((key,ki)=>{
       const v=nr?chartValue(chart,nr,key):null;
       if(v!==null && v>=y0 && v<=y1){ ctx.fillStyle=COLORS[ki%COLORS.length]; ctx.beginPath(); ctx.arc(cursorX,y(v),3.2,0,Math.PI*2); ctx.fill(); }
     });
@@ -787,6 +1020,11 @@ function drawTrialStrip() {
   const left=4,right=4,top=6,bottom=10,pw=w-left-right,ph=h-top-bottom;
   const [t0,t1]=state.domain; const x=t=>left+((t-t0)/(t1-t0))*pw;
   ctx.fillStyle="#555555"; ctx.fillRect(left,top,pw,ph);
+  for(let i=0;i<state.trialGroups.length-1;i++){
+    const a=state.trialGroups[i].end, b=state.trialGroups[i+1].start;
+    const gx1=x(a), gx2=x(b);
+    if(gx2>gx1){ ctx.fillStyle="rgba(135,145,140,.22)"; ctx.fillRect(gx1,top,gx2-gx1,ph); }
+  }
   for(const g of state.trialGroups){
     const x1=Math.max(left,x(g.start)), x2=Math.min(left+pw,x(g.end));
     if(x2<=left||x1>=left+pw) continue;
@@ -835,6 +1073,30 @@ function jumpTrial(direction){
   state.currentTime=Math.max(state.domain[0],Math.min(state.domain[1],state.currentTime)); syncSliderFromTime(); updateAll();
 }
 
+function jumpMove(direction){
+  if(!state.trials.length) return;
+  stopPlayback();
+
+  const anchors = [];
+  for (const g of state.trialGroups) {
+    for (const m of g.moves) {
+      anchors.push({t:m.start, trial:g.trial, move:m._move});
+    }
+  }
+  anchors.sort((a,b)=>a.t-b.t);
+
+  let target = null;
+  if(direction > 0) {
+    target = anchors.find(a => a.t > state.currentTime + 0.05) || anchors[anchors.length-1];
+  } else {
+    target = [...anchors].reverse().find(a => a.t < state.currentTime - 0.05) || anchors[0];
+  }
+
+  state.currentTime = Math.max(state.domain[0], Math.min(state.domain[1], target.t));
+  syncSliderFromTime();
+  updateAll();
+}
+
 function escapeHTML(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c])); }
 
 el("loadParticipant").addEventListener("click",()=>loadParticipant(el("participantSelect").value));
@@ -843,6 +1105,8 @@ el("timeSlider").addEventListener("input",()=>{ stopPlayback(); state.currentTim
 el("playPause").addEventListener("click",togglePlayback);
 el("prevTrial").addEventListener("click",()=>jumpTrial(-1));
 el("nextTrial").addEventListener("click",()=>jumpTrial(1));
+el("prevMove").addEventListener("click",()=>jumpMove(-1));
+el("nextMove").addEventListener("click",()=>jumpMove(1));
 el("viewSelect").addEventListener("change",()=>{ updateDomain(); updateAll(); });
 el("trialStrip").addEventListener("click",event=>{
   const rect=event.currentTarget.getBoundingClientRect(); const f=(event.clientX-rect.left)/rect.width;
