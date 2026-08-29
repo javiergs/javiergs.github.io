@@ -180,11 +180,14 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
 .quality-chip.q0 { background: #969b98; }
 .quality-chip.q1 { background: #d32f2f; }
 .quality-chip.q2 { background: #f57c00; }
-.quality-chip.q3 { background: #a6b83f; }
-.quality-chip.q4 { background: #1f8a4c; }
+.quality-chip.q3 { background: #8fca72; }
+.quality-chip.q4 { background: #176b3a; }
 
 
 /* Three compact human-readable motion cards in one row */
 .motion-summary-wrap {
   height: 205px;
 }
+
+
+.wireless-status-wrap { height: 115px; }

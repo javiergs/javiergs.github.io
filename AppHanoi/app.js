@@ -360,14 +360,19 @@ function renderSnapshot() {
     ["Motion", [["Movement",movementSnapshotValue(state.data.motion,state.currentTime)],["Heading",magneticHeadingLabel(m)],["Tilt",tiltSnapshotValue(m)]]],
     ["Device", [["Battery", `${snapshotValue(d,"Battery Percent",0)}%`],["Wireless",snapshotValue(d,"Wireless Signal",0)],["Sensor 0",snapshotValue(d,"Quality Sensor 0",0)],["Sensor 1",snapshotValue(d,"Quality Sensor 1",0)],["Sensor 2",snapshotValue(d,"Quality Sensor 2",0)],["Sensor 3",snapshotValue(d,"Quality Sensor 3",0)],["Sensor 4",snapshotValue(d,"Quality Sensor 4",0)]]]
   ];
-  el("snapshot").innerHTML = groups.map(([name, rows]) => `<div class="snapshot-group"><h3>${name}</h3>${rows.map(([k,v]) => `<div class="snapshot-row"><span>${escapeHTML(k)}</span><strong>${escapeHTML(v)}</strong></div>`).join("")}</div>`).join("");
+  el("snapshot").innerHTML = groups.map(([name, rows]) => `<div class="snapshot-group"><h3>${name}</h3>${rows.map(([k,v]) => `<div class="snapshot-row"><span>${escapeHTML(displaySeriesLabel(chart,k))}</span><strong>${escapeHTML(v)}</strong></div>`).join("")}</div>`).join("");
+}
+
+function displaySeriesLabel(chart, key) {
+  if (chart.id === "affect" && key === "Focus") return "Attention";
+  return key;
 }
 
 function buildCharts() {
   const configs = [
     {
       id:"affect", source:"affect", title:"Affect",
-      note:"Active performance metrics only · −1 treated as missing",
+      note:"Active performance metrics only · Attention displayed from recorded Focus field · −1 treated as missing",
       keys:["Focus","Engagement","Excitement","Interest","Relaxation","Stress"],
       activePrefix:"Active ", yDomain:[0,1], yTicks:[0,.25,.5,.75,1],
       selectable:true
@@ -419,10 +424,9 @@ function buildCharts() {
       yDomain:[0,100], yTicks:[0,25,50,75,100]
     },
     {
-      id:"wireless", source:"device", type:"qualityBars", title:"Device · Wireless Signal",
-      note:"Discrete values · no smoothing",
+      id:"wireless", source:"device", type:"wirelessStatus", title:"Device · Wireless Signal",
+      note:"EMOTIV wireless signal range 0–1 · 1 is best",
       keys:["Wireless Signal"],
-      yDomain:[0,1], yTicks:[0,1],
       noSmooth:true
     }
   ];
@@ -434,6 +438,7 @@ function buildCharts() {
         c.type === "faceLane" ? " face-single-wrap" :
         c.type === "heading" ? " heading-chart-wrap" :
         c.type === "motionSummary" ? " motion-summary-wrap" :
+        c.type === "wirelessStatus" ? " wireless-status-wrap" :
         c.type === "qualityLanes" ? " quality-lanes-wrap" : ""
       }"><canvas id="chart-${c.id}"></canvas></div>
       <div class="legend${c.selectable ? " selectable-legend" : ""}" id="legend-${c.id}"></div>
@@ -466,7 +471,7 @@ function buildCharts() {
       legend.innerHTML = [...actions].sort().map(action =>
         `<span class="legend-item" style="color:${faceActionColor(action)}"><span class="legend-swatch face-swatch"></span>${escapeHTML(action)}</span>`
       ).join("");
-    } else if (chart.type === "heading" || chart.type === "motionSummary") {
+    } else if (chart.type === "heading" || chart.type === "motionSummary" || chart.type === "wirelessStatus") {
       legend.innerHTML = "";
     } else if (chart.type === "qualityLanes") {
       legend.innerHTML =
@@ -479,12 +484,12 @@ function buildCharts() {
       legend.innerHTML = chart.keys.map((k,i) =>
         `<label class="series-check" style="color:${COLORS[i % COLORS.length]}">
           <input type="checkbox" data-chart="${chart.id}" data-key="${escapeHTML(k)}" ${state.visibleSeries[chart.id][k] !== false ? "checked" : ""}>
-          <span class="legend-swatch"></span>${escapeHTML(k)}
+          <span class="legend-swatch"></span>${escapeHTML(displaySeriesLabel(chart,k))}
         </label>`
       ).join("");
     } else {
       legend.innerHTML = (chart.keys || []).map((k,i) =>
-        `<span class="legend-item" style="color:${COLORS[i % COLORS.length]}"><span class="legend-swatch"></span>${escapeHTML(k)}</span>`
+        `<span class="legend-item" style="color:${COLORS[i % COLORS.length]}"><span class="legend-swatch"></span>${escapeHTML(displaySeriesLabel(chart,k))}</span>`
       ).join("");
     }
   });
@@ -572,7 +577,7 @@ function buildSmoothedRows(chart, windowSeconds) {
 }
 
 function processedChartRows(chart) {
-  if (chart.type === "motionSummary" || chart.type === "faceLane" || chart.type === "qualityLanes" || chart.type === "heading" || chart.noSmooth || state.chartMode !== "smooth") return chart.rows;
+  if (chart.type === "wirelessStatus" || chart.type === "motionSummary" || chart.type === "faceLane" || chart.type === "qualityLanes" || chart.type === "heading" || chart.noSmooth || state.chartMode !== "smooth") return chart.rows;
 
   if (chart.smoothCacheSeconds !== state.smoothSeconds || !chart.smoothRows) {
     chart.smoothRows = buildSmoothedRows(chart, state.smoothSeconds);
@@ -594,7 +599,7 @@ function refreshChartModeUI() {
     const note = card ? card.querySelector(".chart-note") : null;
     if (!note) return;
 
-    if (chart.type === "motionSummary" || chart.type === "faceLane" || chart.type === "qualityLanes") {
+    if (chart.type === "wirelessStatus" || chart.type === "motionSummary" || chart.type === "faceLane" || chart.type === "qualityLanes") {
       note.textContent = chart.note;
       return;
     }
@@ -851,6 +856,59 @@ function gravityTilt(row) {
   return {roll, pitch};
 }
 
+
+function movementTimeline(rows,t0,t1,targetPoints=400){
+  if(!rows || !rows.length) return [];
+  const visible=rows.filter(r=>r._t>=t0 && r._t<=t1);
+  if(!visible.length) return [];
+  const stride=Math.max(1,Math.floor(visible.length/targetPoints));
+  const out=[];
+  for(let i=0;i<visible.length;i+=stride){
+    const r=visible[i];
+    out.push({t:r._t,v:movementMagnitude(rows,r._t)});
+  }
+  return out;
+}
+
+function angleDifference(a,b){
+  let d=(a-b+540)%360-180;
+  return d;
+}
+
+function stableScreenBaseline(rows){
+  if(!rows || !rows.length) return null;
+  // Use the median of the first stable ~20 seconds as the participant-specific
+  // screen-facing reference. This avoids assuming magnetic North = screen.
+  const start=rows[0]._t;
+  const candidates=rows.filter(r=>r._t>=start && r._t<=start+20);
+  const headings=[], pitches=[];
+  for(const r of candidates){
+    const h=magneticHeading(r);
+    const t=gravityTilt(r);
+    if(h!==null && t){ headings.push(h); pitches.push(t.pitch); }
+  }
+  if(!headings.length) return null;
+  const circularMeanDeg=vals=>{
+    let sx=0,sy=0;
+    vals.forEach(v=>{ const a=v*Math.PI/180; sx+=Math.cos(a); sy+=Math.sin(a); });
+    return (Math.atan2(sy,sx)*180/Math.PI+360)%360;
+  };
+  pitches.sort((a,b)=>a-b);
+  return {heading:circularMeanDeg(headings),pitch:pitches[Math.floor(pitches.length/2)]};
+}
+
+function screenRelativeOrientation(rows,time){
+  const row=nearestRow(rows,time);
+  const base=stableScreenBaseline(rows);
+  const heading=magneticHeading(row);
+  const tilt=gravityTilt(row);
+  if(!base || heading===null || !tilt) return null;
+  const yawDelta=angleDifference(heading,base.heading);
+  const pitchDelta=tilt.pitch-base.pitch;
+  const deviation=Math.sqrt(yawDelta*yawDelta+pitchDelta*pitchDelta);
+  return {yawDelta,pitchDelta,deviation};
+}
+
 function drawMotionSummary(chart) {
   const canvas = el(`chart-${chart.id}`);
   if (!canvas) return;
@@ -859,9 +917,8 @@ function drawMotionSummary(chart) {
   ctx.clearRect(0,0,w,h);
 
   const row = nearestRow(chart.rawRows, state.currentTime);
-  const move = movementMagnitude(chart.rawRows, state.currentTime);
   const heading = magneticHeading(row);
-  const tilt = gravityTilt(row);
+  const orientation = screenRelativeOrientation(chart.rawRows, state.currentTime);
 
   const gap = 14;
   const outer = 8;
@@ -869,9 +926,9 @@ function drawMotionSummary(chart) {
   const cardH = h - 16;
 
   const cards = [
-    {x:outer, title:"MOVEMENT"},
+    {x:outer, title:"MOVEMENT ACTIVITY"},
     {x:outer+cardW+gap, title:"HEAD DIRECTION"},
-    {x:outer+(cardW+gap)*2, title:"HEAD TILT"}
+    {x:outer+(cardW+gap)*2, title:"HEAD ORIENTATION"}
   ];
 
   for (const card of cards) {
@@ -889,62 +946,85 @@ function drawMotionSummary(chart) {
     ctx.fillText(card.title, card.x+14, 20);
   }
 
-  // Movement card: magnitude + descriptive level + mini gauge.
+  // Movement Activity: timeline from raw acceleration residuals.
   const m = cards[0];
-  ctx.fillStyle = "#18211b";
-  ctx.font = "750 27px system-ui";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(movementLabel(move), m.x+cardW/2, 69);
+  const plot = {x:m.x+16, y:48, w:cardW-32, h:95};
+  const [t0,t1] = state.domain;
+  const samples = movementTimeline(chart.rawRows, t0, t1, Math.max(100, Math.floor(plot.w)));
+  let maxV = 0;
+  for (const p of samples) if (p.v !== null) maxV = Math.max(maxV,p.v);
+  maxV = Math.max(maxV,0.03);
 
-  ctx.fillStyle = "#778078";
-  ctx.font = "12px system-ui";
-  ctx.fillText(move === null ? "—" : `${move.toFixed(3)} Δa`, m.x+cardW/2, 96);
+  ctx.strokeStyle="#e1e5e2"; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(plot.x,plot.y+plot.h); ctx.lineTo(plot.x+plot.w,plot.y+plot.h); ctx.stroke();
 
-  const gx = m.x+18, gy = 119, gw = cardW-36, gh = 10;
-  ctx.fillStyle = "#e3e6e4";
-  roundRect(ctx,gx,gy,gw,gh,5); ctx.fill();
-  const fraction = move === null ? 0 : Math.max(0,Math.min(1,move/0.15));
-  ctx.fillStyle = "#ff9364";
-  roundRect(ctx,gx,gy,gw*fraction,gh,5); ctx.fill();
+  ctx.strokeStyle="#ff9364"; ctx.lineWidth=2;
+  ctx.beginPath();
+  let started=false;
+  for (const p of samples) {
+    if (p.v === null) { started=false; continue; }
+    const px=plot.x+((p.t-t0)/(t1-t0))*plot.w;
+    const py=plot.y+plot.h-(Math.min(p.v,maxV)/maxV)*plot.h;
+    if (!started) { ctx.moveTo(px,py); started=true; } else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
 
-  // Direction card: compass.
-  const d = cards[1], cx=d.x+cardW/2, cy=86, radius=Math.min(45,cardW*.22);
+  const currentMove=movementMagnitude(chart.rawRows,state.currentTime);
+  const cursorX=plot.x+((state.currentTime-t0)/(t1-t0))*plot.w;
+  if(cursorX>=plot.x && cursorX<=plot.x+plot.w){
+    ctx.strokeStyle="#69736c"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(cursorX,plot.y); ctx.lineTo(cursorX,plot.y+plot.h); ctx.stroke();
+  }
+  ctx.fillStyle="#18211b"; ctx.font="700 13px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText(`${movementLabel(currentMove)}${currentMove===null?"":` · ${currentMove.toFixed(3)}`}`,m.x+cardW/2,164);
+  ctx.fillStyle="#778078"; ctx.font="10px system-ui";
+  ctx.fillText("relative movement activity",m.x+cardW/2,181);
+
+  // Direction: value inside compass to avoid overlap with S.
+  const d=cards[1], cx=d.x+cardW/2, cy=103, radius=Math.min(55,cardW*.22);
   ctx.strokeStyle="#c9cfcc"; ctx.lineWidth=2;
   ctx.beginPath(); ctx.arc(cx,cy,radius,0,Math.PI*2); ctx.stroke();
   ctx.fillStyle="#778078"; ctx.font="700 10px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.fillText("N",cx,cy-radius-10); ctx.fillText("S",cx,cy+radius+10);
-  ctx.fillText("W",cx-radius-11,cy); ctx.fillText("E",cx+radius+11,cy);
-  if (heading !== null) {
+  ctx.fillText("N",cx,cy-radius-12); ctx.fillText("S",cx,cy+radius+12);
+  ctx.fillText("W",cx-radius-13,cy); ctx.fillText("E",cx+radius+13,cy);
+  if(heading!==null){
     const angle=(heading-90)*Math.PI/180;
     const ex=cx+Math.cos(angle)*radius*.76, ey=cy+Math.sin(angle)*radius*.76;
     ctx.strokeStyle="#ff9364"; ctx.lineWidth=4; ctx.lineCap="round";
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ex,ey); ctx.stroke();
-    ctx.fillStyle="#18211b"; ctx.font="700 13px system-ui";
-    ctx.fillText(`${compassDirection(heading)} ${heading.toFixed(0)}°`,cx,143);
+    ctx.fillStyle="#18211b"; ctx.font="800 14px system-ui";
+    ctx.fillText(compassDirection(heading),cx,cy+2);
+    ctx.font="700 11px system-ui"; ctx.fillText(`${heading.toFixed(0)}°`,cx,cy+19);
   }
-
-  // Tilt card: simple head/axis icon + pitch/roll.
-  const t=cards[2], tcx=t.x+cardW/2, tcy=78;
-  ctx.save();
-  ctx.translate(tcx,tcy);
-  const rollRad = tilt ? Math.max(-45,Math.min(45,tilt.roll))*Math.PI/180 : 0;
-  ctx.rotate(rollRad);
-  ctx.strokeStyle="#ff9364"; ctx.lineWidth=4;
-  ctx.beginPath(); ctx.arc(0,0,28,0,Math.PI*2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0,-28); ctx.lineTo(0,-40); ctx.stroke();
-  ctx.restore();
-
-  ctx.fillStyle="#18211b"; ctx.font="700 13px system-ui"; ctx.textAlign="center";
-  if (tilt) {
-    ctx.fillText(`Pitch ${tilt.pitch.toFixed(0)}°`,tcx,126);
-    ctx.fillText(`Roll ${tilt.roll.toFixed(0)}°`,tcx,145);
-  } else {
-    ctx.fillText("No tilt data",tcx,135);
-  }
-
   ctx.fillStyle="#778078"; ctx.font="10px system-ui";
-  ctx.fillText("gravity-based estimate",tcx,164);
+  ctx.fillText("magnetic heading",cx,181);
+
+  // Screen-relative orientation: face + arrow from participant-specific baseline.
+  const o=cards[2], ocx=o.x+cardW/2, ocy=96;
+  ctx.strokeStyle="#c9cfcc"; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(ocx,ocy,38,0,Math.PI*2); ctx.stroke();
+  // simple face
+  ctx.fillStyle="#69736c";
+  ctx.beginPath(); ctx.arc(ocx-12,ocy-7,2.5,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(ocx+12,ocy-7,2.5,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle="#69736c"; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(ocx,ocy+5,14,0.2*Math.PI,0.8*Math.PI); ctx.stroke();
+
+  if(orientation){
+    const scale=Math.min(28,orientation.deviation*1.2);
+    const dx=Math.sin(orientation.yawDelta*Math.PI/180)*scale;
+    const dy=Math.sin(orientation.pitchDelta*Math.PI/180)*scale;
+    ctx.strokeStyle="#ff9364"; ctx.lineWidth=4; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(ocx,ocy); ctx.lineTo(ocx+dx,ocy+dy); ctx.stroke();
+
+    ctx.fillStyle="#18211b"; ctx.font="800 14px system-ui"; ctx.textAlign="center";
+    ctx.fillText(orientation.deviation < 8 ? "Forward" : `${orientation.deviation.toFixed(0)}° away`,ocx,151);
+    ctx.fillStyle="#778078"; ctx.font="10px system-ui";
+    ctx.fillText("from stable screen-facing baseline",ocx,181);
+  } else {
+    ctx.fillStyle="#778078"; ctx.font="11px system-ui"; ctx.textAlign="center";
+    ctx.fillText("No orientation data",ocx,151);
+  }
 }
 
 function roundRect(ctx,x,y,w,h,r) {
@@ -1053,8 +1133,28 @@ function drawHeadingChart(chart) {
   }
 }
 
+
+function drawWirelessStatus(chart){
+  const canvas=el(`chart-${chart.id}`);
+  if(!canvas) return;
+  const {ctx,w,h}=setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+  const row=nearestRow(chart.rawRows,state.currentTime);
+  const value=row?asNumber(row["Wireless Signal"]):null;
+  const good=value!==null && value>=0.75;
+  const partial=value!==null && value>0 && value<0.75;
+  const label=value===null?"No data":good?"Good":partial?"Weak":"No signal";
+  const cx=w/2,cy=h/2-4;
+  ctx.fillStyle=value===null?"#969b98":good?"#1f8a4c":partial?"#f57c00":"#d32f2f";
+  ctx.beginPath();ctx.arc(cx-56,cy,8,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#18211b";ctx.font="800 25px system-ui";ctx.textAlign="left";ctx.textBaseline="middle";
+  ctx.fillText(label,cx-38,cy);
+  ctx.fillStyle="#778078";ctx.font="12px system-ui";
+  ctx.fillText(value===null?"":`Signal ${value.toFixed(2)} / 1`,cx-38,cy+30);
+}
+
 function qualityColor(value) {
-  const colors = ["#969b98","#d32f2f","#f57c00","#a6b83f","#1f8a4c"];
+  const colors = ["#969b98","#d32f2f","#f57c00","#8fca72","#176b3a"];
   const i = Math.max(0, Math.min(4, Math.round(value)));
   return colors[i];
 }
@@ -1199,6 +1299,7 @@ function drawQualityBars(chart) {
 }
 
 function drawChart(chart) {
+  if (chart.type === "wirelessStatus") { drawWirelessStatus(chart); return; }
   if (chart.type === "motionSummary") { drawMotionSummary(chart); return; }
   if (chart.type === "faceLane") { drawFaceLane(chart); return; }
   if (chart.type === "heading") { drawHeadingChart(chart); return; }
