@@ -156,3 +156,35 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
 .chart-card:has(canvas[id^="chart-deviceQuality"]) .chart-wrap {
   height: 180px;
 }
+
+
+/* Separate facial-action timelines */
+.face-single-wrap { height: 120px; }
+
+/* Five Insight contact-quality lanes, placed immediately after EEG */
+.quality-lanes-wrap { height: 210px; }
+
+.quality-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #d9ddda;
+  font-size: 12px;
+}
+.quality-chip {
+  width: 13px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.quality-chip.q0 { background: #969b98; }
+.quality-chip.q1 { background: #d32f2f; }
+.quality-chip.q2 { background: #f57c00; }
+.quality-chip.q3 { background: #a6b83f; }
+.quality-chip.q4 { background: #1f8a4c; }
+
+
+/* Three compact human-readable motion cards in one row */
+.motion-summary-wrap {
+  height: 205px;
+}
