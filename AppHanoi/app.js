@@ -12,6 +12,16 @@ const FILES = {
 
 const COLORS = ["#154734", "#d9a928", "#477b9d", "#a44949", "#735b8f", "#5b7d64"];
 const DISK_COLORS = ["#ff9364", "#477b9d", "#d9a928", "#735b8f", "#5b7d64", "#a44949"];
+const FACE_ACTION_COLORS = {
+  neutral: "#8f9691",
+  blink: "#477b9d",
+  frown: "#a44949",
+  surprise: "#735b8f",
+  smile: "#4f8a68",
+  laugh: "#d9a928",
+  winkl: "#2f7f83",
+  winkr: "#b56b32"
+};
 const MAX_DRAW_POINTS = 4200;
 const EXPERIMENT_PADDING_SECONDS = 60;
 const DISK_COUNT = 6; // The recorded move sequences solve a six-disk Tower of Hanoi.
@@ -342,32 +352,92 @@ function renderSnapshot() {
     ["Affect", [["Focus",snapshotValue(a,"Focus")],["Engagement",snapshotValue(a,"Engagement")],["Interest",snapshotValue(a,"Interest")],["Stress",snapshotValue(a,"Stress")]]],
     ["PAD", [["Pleasure",snapshotValue(p,"Pleasure")],["Arousal",snapshotValue(p,"Arousal")],["Dominance",snapshotValue(p,"Dominance")]]],
     ["EEG", [["AF3",snapshotValue(e,"AF3",1)],["T7",snapshotValue(e,"T7",1)],["Pz",snapshotValue(e,"Pz",1)],["T8",snapshotValue(e,"T8",1)],["AF4",snapshotValue(e,"AF4",1)]]],
-    ["Face", [["Upper",snapshotValue(f,"Action Upper Face",0)],["Upper power",snapshotValue(f,"Power Upper Face")],["Lower",snapshotValue(f,"Action Lower Face",0)],["Lower power",snapshotValue(f,"Power Lower Face")]]],
+    ["Face", [["Eye",snapshotValue(f,"Action Eye",0)],["Upper",snapshotValue(f,"Action Upper Face",0)],["Upper power",snapshotValue(f,"Power Upper Face")],["Lower",snapshotValue(f,"Action Lower Face",0)],["Lower power",snapshotValue(f,"Power Lower Face")]]],
     ["Motion", [["Accel X",snapshotValue(m,"Accelerometer X",3)],["Accel Y",snapshotValue(m,"Accelerometer Y",3)],["Accel Z",snapshotValue(m,"Accelerometer Z",3)]]],
-    ["Device", [["Battery", `${snapshotValue(d,"Battery Percent",0)}%`],["Wireless",snapshotValue(d,"Wireless Signal",1)],["Quality",snapshotValue(d,"Overall Quality",0)]]]
+    ["Device", [["Battery", `${snapshotValue(d,"Battery Percent",0)}%`],["Overall",snapshotValue(d,"Overall Quality",0)],["Wireless",snapshotValue(d,"Wireless Signal",0)],["Sensor 0",snapshotValue(d,"Quality Sensor 0",0)],["Sensor 1",snapshotValue(d,"Quality Sensor 1",0)],["Sensor 2",snapshotValue(d,"Quality Sensor 2",0)],["Sensor 3",snapshotValue(d,"Quality Sensor 3",0)],["Sensor 4",snapshotValue(d,"Quality Sensor 4",0)]]]
   ];
   el("snapshot").innerHTML = groups.map(([name, rows]) => `<div class="snapshot-group"><h3>${name}</h3>${rows.map(([k,v]) => `<div class="snapshot-row"><span>${escapeHTML(k)}</span><strong>${escapeHTML(v)}</strong></div>`).join("")}</div>`).join("");
 }
 
 function buildCharts() {
   const configs = [
-    { id:"affect", title:"Affect", note:"Active performance metrics", keys:["Focus","Engagement","Excitement","Interest","Relaxation","Stress"], activePrefix:"Active " },
-    { id:"pad", title:"PAD", note:"Pleasure · Arousal · Dominance", keys:["Pleasure","Arousal","Dominance"] },
-    { id:"eeg", title:"EEG", note:"AF3 · T7 · Pz · T8 · AF4 (display downsampled)", keys:["AF3","T7","Pz","T8","AF4"] },
-    { id:"face", title:"Facial Expression", note:"Power of current upper/lower facial action", keys:["Power Upper Face","Power Lower Face"] },
-    { id:"motion", title:"Motion", note:"Accelerometer X · Y · Z", keys:["Accelerometer X","Accelerometer Y","Accelerometer Z"] },
-    { id:"device", title:"Device", note:"Battery percent · overall contact quality", keys:["Battery Percent","Overall Quality"] }
+    {
+      id:"affect", source:"affect", title:"Affect",
+      note:"Active performance metrics only · −1 treated as missing",
+      keys:["Focus","Engagement","Excitement","Interest","Relaxation","Stress"],
+      activePrefix:"Active ", yDomain:[0,1], yTicks:[0,.25,.5,.75,1]
+    },
+    {
+      id:"pad", source:"pad", title:"PAD",
+      note:"Pleasure · Arousal · Dominance",
+      keys:["Pleasure","Arousal","Dominance"],
+      yDomain:[-1,1], yTicks:[-1,-.5,0,.5,1]
+    },
+    {
+      id:"eeg", source:"eeg", title:"EEG",
+      note:"AF3 · T7 · Pz · T8 · AF4 (display downsampled)",
+      keys:["AF3","T7","Pz","T8","AF4"]
+    },
+    {
+      id:"face", source:"face", type:"face", title:"Facial Actions",
+      note:"Action category by color · upper/lower power by intensity",
+      keys:[]
+    },
+    {
+      id:"motion", source:"motion", title:"Motion",
+      note:"Accelerometer X · Y · Z",
+      keys:["Accelerometer X","Accelerometer Y","Accelerometer Z"]
+    },
+    {
+      id:"deviceOverview", source:"device", title:"Device · Battery / Overall",
+      note:"Battery Percent · Overall Quality",
+      keys:["Battery Percent","Overall Quality"],
+      yDomain:[0,100], yTicks:[0,25,50,75,100]
+    },
+    {
+      id:"deviceQuality", source:"device", title:"Device · Signal / Sensor Quality",
+      note:"Wireless Signal · Quality Sensors 0–4",
+      keys:["Wireless Signal","Quality Sensor 0","Quality Sensor 1","Quality Sensor 2","Quality Sensor 3","Quality Sensor 4"],
+      yDomain:[0,4], yTicks:[0,1,2,3,4]
+    }
   ];
-  el("charts").innerHTML = configs.map(c => `<article class="card chart-card"><div class="chart-title-row"><h2>${c.title}</h2><div class="chart-note">${c.note}</div></div><div class="chart-wrap"><canvas id="chart-${c.id}"></canvas></div><div class="legend" id="legend-${c.id}"></div></article>`).join("");
-  state.charts = configs.map(c => ({
-    ...c,
-    rawRows: state.data[c.id] || [],
-    rows: downsample(state.data[c.id] || []),
-    smoothCacheSeconds: null,
-    smoothRows: null
-  }));
+
+  el("charts").innerHTML = configs.map(c =>
+    `<article class="card chart-card">
+      <div class="chart-title-row"><h2>${c.title}</h2><div class="chart-note">${c.note}</div></div>
+      <div class="chart-wrap${c.type === "face" ? " face-chart-wrap" : ""}"><canvas id="chart-${c.id}"></canvas></div>
+      <div class="legend" id="legend-${c.id}"></div>
+    </article>`
+  ).join("");
+
+  state.charts = configs.map(c => {
+    const rawRows = state.data[c.source] || [];
+    return {
+      ...c,
+      rawRows,
+      rows: downsample(rawRows),
+      smoothCacheSeconds: null,
+      smoothRows: null
+    };
+  });
+
   state.charts.forEach(chart => {
-    el(`legend-${chart.id}`).innerHTML = chart.keys.map((k,i) => `<span class="legend-item" style="color:${COLORS[i % COLORS.length]}"><span class="legend-swatch"></span>${escapeHTML(k.replace("Power ",""))}</span>`).join("");
+    if (chart.type === "face") {
+      const actions = new Set();
+      for (const row of chart.rawRows) {
+        ["Action Eye","Action Upper Face","Action Lower Face"].forEach(key => {
+          const action = String(row[key] || "").trim().toLowerCase();
+          if (action) actions.add(action);
+        });
+      }
+      el(`legend-${chart.id}`).innerHTML = [...actions].sort().map(action =>
+        `<span class="legend-item" style="color:${faceActionColor(action)}"><span class="legend-swatch face-swatch"></span>${escapeHTML(action)}</span>`
+      ).join("");
+    } else {
+      el(`legend-${chart.id}`).innerHTML = chart.keys.map((k,i) =>
+        `<span class="legend-item" style="color:${COLORS[i % COLORS.length]}"><span class="legend-swatch"></span>${escapeHTML(k.replace("Power ",""))}</span>`
+      ).join("");
+    }
   });
 }
 
@@ -437,7 +507,7 @@ function buildSmoothedRows(chart, windowSeconds) {
 }
 
 function processedChartRows(chart) {
-  if (state.chartMode !== "smooth") return chart.rows;
+  if (chart.type === "face" || state.chartMode !== "smooth") return chart.rows;
 
   if (chart.smoothCacheSeconds !== state.smoothSeconds || !chart.smoothRows) {
     chart.smoothRows = buildSmoothedRows(chart, state.smoothSeconds);
@@ -452,25 +522,30 @@ function refreshChartModeUI() {
   if (control) control.disabled = !smooth;
 
   state.charts.forEach(chart => {
-    const baseNote = {
-      affect: "Active performance metrics",
+    const canvas = el(`chart-${chart.id}`);
+    if (!canvas) return;
+
+    const card = canvas.closest(".chart-card");
+    const note = card ? card.querySelector(".chart-note") : null;
+    if (!note) return;
+
+    if (chart.type === "face") {
+      note.textContent = "Action category by color · upper/lower power by intensity";
+      return;
+    }
+
+    const base = {
+      affect: "Active performance metrics only · −1 treated as missing",
       pad: "Pleasure · Arousal · Dominance",
       eeg: "AF3 · T7 · Pz · T8 · AF4",
-      face: "Power of current upper/lower facial action",
       motion: "Accelerometer X · Y · Z",
-      device: "Battery percent · overall contact quality"
-    }[chart.id];
+      deviceOverview: "Battery Percent · Overall Quality",
+      deviceQuality: "Wireless Signal · Quality Sensors 0–4"
+    }[chart.id] || chart.note;
 
-    chart.note = smooth
-      ? `${baseNote} · centered ${state.smoothSeconds}s moving average`
-      : `${baseNote}${chart.id === "eeg" ? " (display downsampled)" : ""}`;
-
-    const canvas = el(`chart-${chart.id}`);
-    if (canvas) {
-      const card = canvas.closest(".chart-card");
-      const note = card ? card.querySelector(".chart-note") : null;
-      if (note) note.textContent = chart.note;
-    }
+    note.textContent = smooth
+      ? `${base} · centered ${state.smoothSeconds}s moving average`
+      : `${base}${chart.id === "eeg" ? " (display downsampled)" : ""}`;
   });
 }
 
@@ -487,28 +562,34 @@ function setupCanvas(canvas) {
 }
 
 function chartValue(chart, row, key) {
-  if (chart.activePrefix) {
-    const active = String(row[chart.activePrefix + key]).toLowerCase() === "true";
+  if (
+    chart.activePrefix &&
+    Object.prototype.hasOwnProperty.call(row, chart.activePrefix + key)
+  ) {
+    const active = String(row[chart.activePrefix + key]).trim().toLowerCase() === "true";
     if (!active) return null;
   }
-  return asNumber(row[key]);
+  const value = asNumber(row[key]);
+  if (chart.id === "affect" && value === -1) return null;
+  return value;
 }
 
 function computeYDomain(chart, rowsInDomain) {
+  if (chart.yDomain) return chart.yDomain;
+
   const values = [];
   for (const r of rowsInDomain) for (const key of chart.keys) {
     const v = chartValue(chart, r, key);
     if (v !== null) values.push(v);
   }
   if (!values.length) return [0,1];
+
   values.sort((a,b)=>a-b);
   let min = values[0], max = values[values.length-1];
   if (values.length > 100) {
     min = values[Math.floor(values.length * .005)];
     max = values[Math.floor(values.length * .995)];
   }
-  if (chart.id === "affect") { min = 0; max = 1; }
-  if (chart.id === "pad") { min = Math.min(-1, min); max = Math.max(1, max); }
   if (min === max) { min -= .5; max += .5; }
   const pad = (max-min) * .07;
   return [min-pad, max+pad];
@@ -527,7 +608,113 @@ function drawBackgroundBands(ctx, left, top, width, height, x) {
   ctx.restore();
 }
 
+
+function normalizeFaceAction(action) {
+  return String(action || "neutral").trim().toLowerCase() || "neutral";
+}
+
+function faceActionColor(action) {
+  const key = normalizeFaceAction(action).replace(/\s+/g, "");
+  if (FACE_ACTION_COLORS[key]) return FACE_ACTION_COLORS[key];
+
+  // Stable fallback color for unexpected categories.
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0;
+  return COLORS[Math.abs(hash) % COLORS.length];
+}
+
+function drawFaceChart(chart) {
+  const canvas = el(`chart-${chart.id}`);
+  if (!canvas) return;
+
+  const {ctx,w,h} = setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+
+  const margin = {l:88,r:15,t:12,b:26};
+  const pw = w-margin.l-margin.r, ph = h-margin.t-margin.b;
+  const [t0,t1] = state.domain;
+  const x = t => margin.l + ((t-t0)/(t1-t0))*pw;
+
+  drawBackgroundBands(ctx, margin.l, margin.t, pw, ph, x);
+
+  const lanes = [
+    { label:"Eye", action:"Action Eye", power:null },
+    { label:"Upper Face", action:"Action Upper Face", power:"Power Upper Face" },
+    { label:"Lower Face", action:"Action Lower Face", power:"Power Lower Face" }
+  ];
+
+  const laneH = ph / lanes.length;
+  ctx.font = "11px system-ui";
+  ctx.textBaseline = "middle";
+
+  lanes.forEach((lane, laneIndex) => {
+    const y0 = margin.t + laneIndex * laneH;
+    const centerY = y0 + laneH / 2;
+
+    ctx.fillStyle = "#a8a8a8";
+    ctx.textAlign = "right";
+    ctx.fillText(lane.label, margin.l - 9, centerY);
+
+    ctx.strokeStyle = "#686868";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(margin.l, y0 + laneH);
+    ctx.lineTo(margin.l + pw, y0 + laneH);
+    ctx.stroke();
+  });
+
+  // Use the display-sized stream for responsive playback.
+  const rows = chart.rows.filter(r => r._t >= t0 - 1 && r._t <= t1 + 1);
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const nextT = i + 1 < rows.length ? rows[i+1]._t : row._t + 0.1;
+    const x1 = Math.max(margin.l, x(row._t));
+    const x2 = Math.min(margin.l + pw, x(nextT));
+    if (x2 <= margin.l || x1 >= margin.l + pw || x2 <= x1) continue;
+
+    lanes.forEach((lane, laneIndex) => {
+      const action = normalizeFaceAction(row[lane.action]);
+      let power = lane.power ? asNumber(row[lane.power]) : 1;
+      if (power === null) power = 0;
+      power = Math.max(0, Math.min(1, power));
+
+      // Neutral stays visible but subdued; active expressions scale with power.
+      const alpha = action === "neutral"
+        ? 0.20
+        : (lane.power ? 0.30 + 0.70 * power : 0.78);
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = faceActionColor(action);
+      const y0 = margin.t + laneIndex * laneH + 4;
+      ctx.fillRect(x1, y0, Math.max(1, x2-x1+0.5), laneH - 8);
+    });
+  }
+  ctx.globalAlpha = 1;
+
+  // Time ticks.
+  ctx.fillStyle = "#a8a8a8";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  for (let i=0;i<=4;i++) {
+    const xx = margin.l + pw*i/4;
+    const tt = t0 + (t1-t0)*i/4;
+    ctx.fillText(formatClockShort(tt), xx, margin.t+ph+6);
+  }
+
+  // Shared cursor.
+  const cursorX = x(state.currentTime);
+  if (cursorX >= margin.l && cursorX <= margin.l + pw) {
+    ctx.strokeStyle = "#ff9364";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cursorX, margin.t);
+    ctx.lineTo(cursorX, margin.t+ph);
+    ctx.stroke();
+  }
+}
+
 function drawChart(chart) {
+  if (chart.type === "face") { drawFaceChart(chart); return; }
   const canvas = el(`chart-${chart.id}`);
   if (!canvas) return;
   const {ctx,w,h} = setupCanvas(canvas);
@@ -544,9 +731,9 @@ function drawChart(chart) {
   drawBackgroundBands(ctx, margin.l, margin.t, pw, ph, x);
   ctx.strokeStyle = "#686868"; ctx.lineWidth = 1;
   ctx.fillStyle = "#a8a8a8"; ctx.font = "11px system-ui"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
-  for (let i=0;i<=4;i++) {
-    const yy = margin.t + ph*i/4;
-    const value = y1-(y1-y0)*i/4;
+  const yTicks = chart.yTicks || Array.from({length:5}, (_,i) => y1-(y1-y0)*i/4);
+  for (const value of yTicks) {
+    const yy = y(value);
     ctx.beginPath(); ctx.moveTo(margin.l,yy); ctx.lineTo(margin.l+pw,yy); ctx.stroke();
     ctx.fillText(formatAxis(value), margin.l-7, yy);
   }

@@ -129,3 +129,6 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
   .move-meta { grid-template-columns: repeat(2,1fr); }
   .chart-wrap { height: 200px; }
 }
+
+.face-chart-wrap { height: 190px; }
+.face-swatch { height: 8px; width: 12px; border-radius: 2px; }

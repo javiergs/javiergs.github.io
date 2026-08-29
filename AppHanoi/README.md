@@ -1,9 +1,11 @@
-Dashboard for synchronized Tower of Hanoi behavioral and physiological data.
+# HanoiDashboard
 
-## Application layout
+Static GitHub Pages dashboard for synchronized Tower of Hanoi behavioral and physiological data.
+
+## Repository layout
 
 ```text
-AppHanoi/
+HanoiDashboard/
 ├── index.html
 ├── app.js
 ├── style.css
@@ -39,26 +41,27 @@ No application code needs to change.
 ## Local preview
 
 Because the page loads data with `fetch()`, do not open `index.html` directly with `file://`.
-
-Run a tiny local server from the main GitHub Pages repository folder:
+Run a tiny local server from the repository folder instead:
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Then visit:
-
-`http://localhost:8000/AppHanoi/`
+Then visit `http://localhost:8000/`.
 
 ## GitHub Pages
 
-The application is available at:
+Push the repository to GitHub, then open:
 
-`https://javiergs.github.io/AppHanoi/`
+**Settings → Pages → Build and deployment → Deploy from a branch → `main` / `(root)`**
+
+For repository `HanoiDashboard`, the project page will be under:
+
+`https://javiergs.github.io/HanoiDashboard/`
 
 A participant can be linked directly using:
 
-`https://javiergs.github.io/AppHanoi/?participant=872`
+`https://javiergs.github.io/HanoiDashboard/?participant=872`
 
 ## Data interpretation used by the dashboard
 
