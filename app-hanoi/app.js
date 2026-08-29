@@ -404,6 +404,12 @@ function buildCharts() {
       noSmooth:true
     },
     {
+      id:"wireless", source:"device", type:"wirelessStatus", title:"Device · Wireless Signal Quality",
+      note:"EMOTIV wireless signal 0–1 · forest green = 1 · orange/red = reduced · gray = 0",
+      keys:["Wireless Signal"],
+      noSmooth:true
+    },
+    {
       id:"faceEye", source:"face", type:"faceLane", title:"Facial Expression · Eyes",
       note:"Eye action category by color",
       actionKey:"Action Eye", powerKey:null
@@ -1045,99 +1051,139 @@ function relativeDirectionText(value, negativeLabel, positiveLabel){
 function drawCartoonHead(ctx,cx,cy,yawDeg,pitchDeg){
   const yaw=Math.max(-90,Math.min(90,yawDeg));
   const pitch=Math.max(-45,Math.min(45,pitchDeg));
-  const yawNorm=yaw/90;
-  const pitchNorm=pitch/45;
+  const yn=yaw/90;
+  const pn=pitch/45;
+  const turn=Math.abs(yn);
+  const side=yn>=0?1:-1;
 
-  // The face becomes narrower as it turns toward profile.
-  const headW=42*(1-0.42*Math.abs(yawNorm));
-  const headH=48*(1-0.10*Math.abs(pitchNorm));
+  // More polished face inspired by the approved profile illustration:
+  // rounded head, hair cap, visible near ear, eye/brow, curved coral nose.
+  const rx=40*(1-0.28*turn);
+  const ry=48*(1-0.06*Math.abs(pn));
+  const featureX=cx+yn*rx*0.42;
+  const featureY=cy+pn*10;
 
   ctx.save();
-
-  // Head outline.
-  ctx.strokeStyle="#c9cfcc";
-  ctx.lineWidth=3;
-  ctx.beginPath();
-  ctx.ellipse(cx,cy,headW,headH,0,0,Math.PI*2);
-  ctx.stroke();
-
-  // Ear visibility: far ear fades out, near ear remains visible.
-  const leftEarAlpha=Math.max(0.15,1-Math.max(0,yawNorm)*0.85);
-  const rightEarAlpha=Math.max(0.15,1-Math.max(0,-yawNorm)*0.85);
-
-  ctx.globalAlpha=leftEarAlpha;
-  ctx.beginPath();
-  ctx.ellipse(cx-headW-2,cy,5,10,0,0,Math.PI*2);
-  ctx.stroke();
-
-  ctx.globalAlpha=rightEarAlpha;
-  ctx.beginPath();
-  ctx.ellipse(cx+headW+2,cy,5,10,0,0,Math.PI*2);
-  ctx.stroke();
-  ctx.globalAlpha=1;
-
-  // Facial center shifts toward the direction of the turn.
-  const featureShiftX=yawNorm*headW*0.47;
-  const featureShiftY=pitchNorm*headH*0.24;
-  const fcX=cx+featureShiftX;
-  const fcY=cy+featureShiftY;
-
-  // Eyes become closer together as yaw approaches profile.
-  const eyeSeparation=13*(1-0.66*Math.abs(yawNorm));
-  const eyeY=fcY-10;
-
-  // Far eye becomes smaller / disappears near full profile.
-  const nearProfile=Math.abs(yawNorm);
-  const farEyeAlpha=Math.max(0,1-nearProfile*1.25);
-
-  ctx.fillStyle="#69736c";
-
-  // left eye
-  ctx.globalAlpha = yawNorm > 0 ? farEyeAlpha : 1;
-  ctx.beginPath();
-  ctx.ellipse(fcX-eyeSeparation,eyeY,3.0,2.2,0,0,Math.PI*2);
-  ctx.fill();
-
-  // right eye
-  ctx.globalAlpha = yawNorm < 0 ? farEyeAlpha : 1;
-  ctx.beginPath();
-  ctx.ellipse(fcX+eyeSeparation,eyeY,3.0,2.2,0,0,Math.PI*2);
-  ctx.fill();
-  ctx.globalAlpha=1;
-
-  // Pupils add a subtle look direction inside the visible eye(s).
-  const pupilDX=yawNorm*1.4;
-  const pupilDY=pitchNorm*1.2;
-  ctx.fillStyle="#18211b";
-  if(!(yawNorm>0 && farEyeAlpha<0.08)){
-    ctx.beginPath();ctx.arc(fcX-eyeSeparation+pupilDX,eyeY+pupilDY,1.2,0,Math.PI*2);ctx.fill();
-  }
-  if(!(yawNorm<0 && farEyeAlpha<0.08)){
-    ctx.beginPath();ctx.arc(fcX+eyeSeparation+pupilDX,eyeY+pupilDY,1.2,0,Math.PI*2);ctx.fill();
-  }
-
-  // Nose moves strongly toward the face edge. At +/-90° it reaches the oval border.
-  const noseBaseX=fcX;
-  const noseTipX=cx+yawNorm*headW;
-  const noseY=fcY+1;
-  const noseTipY=noseY + pitchNorm*5;
-
-  ctx.strokeStyle="#ff9364";
-  ctx.lineWidth=3;
   ctx.lineCap="round";
+  ctx.lineJoin="round";
+
+  // Head
+  ctx.fillStyle="#fbfbfa";
+  ctx.strokeStyle="#555b57";
+  ctx.lineWidth=2.6;
   ctx.beginPath();
-  ctx.moveTo(noseBaseX,noseY-7);
-  ctx.lineTo(noseTipX,noseTipY);
+  ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+  ctx.fill();
   ctx.stroke();
 
-  // Mouth follows the shifted face center.
-  ctx.strokeStyle="#69736c";
-  ctx.lineWidth=2;
-  const mouthHalf=10*(1-0.45*Math.abs(yawNorm));
+  // Hair cap
+  ctx.fillStyle="#5c605d";
+  ctx.strokeStyle="#4d524f";
+  ctx.lineWidth=1.5;
   ctx.beginPath();
-  ctx.moveTo(fcX-mouthHalf,fcY+16);
-  ctx.quadraticCurveTo(fcX,fcY+20,fcX+mouthHalf,fcY+16);
+  ctx.moveTo(cx-rx*.82,cy-ry*.25);
+  ctx.quadraticCurveTo(cx-rx*.9,cy-ry*.86,cx-rx*.18,cy-ry*.96);
+  ctx.quadraticCurveTo(cx+rx*.35,cy-ry*1.02,cx+rx*.58,cy-ry*.68);
+  ctx.quadraticCurveTo(cx+rx*.22,cy-ry*.78,cx-rx*.10,cy-ry*.65);
+  ctx.quadraticCurveTo(cx-rx*.30,cy-ry*.43,cx-rx*.42,cy-ry*.22);
+  ctx.closePath();
+  ctx.fill();
   ctx.stroke();
+
+  // Ears: keep both at frontal views; progressively hide the far ear.
+  const nearEarX=cx+side*(rx+2);
+  const farEarX=cx-side*(rx+2);
+  ctx.strokeStyle="#686d69";
+  ctx.lineWidth=2.2;
+
+  ctx.globalAlpha=0.95;
+  ctx.beginPath();
+  ctx.ellipse(nearEarX,cy+2,6.5,12,0,0,Math.PI*2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(nearEarX-side*1.5,cy+2,3.3,-Math.PI/2,Math.PI/2);
+  ctx.stroke();
+
+  ctx.globalAlpha=Math.max(.08,1-turn*1.18);
+  ctx.beginPath();
+  ctx.ellipse(farEarX,cy+2,6.5,12,0,0,Math.PI*2);
+  ctx.stroke();
+  ctx.globalAlpha=1;
+
+  // Eye spacing compresses with yaw; far eye fades toward profile.
+  const eyeSep=12*(1-.64*turn);
+  const eyeY=featureY-8;
+  const nearEyeX=featureX+side*eyeSep;
+  const farEyeX=featureX-side*eyeSep;
+
+  ctx.fillStyle="#4e5450";
+  ctx.globalAlpha=1;
+  ctx.beginPath();ctx.ellipse(nearEyeX,eyeY,3.2,4.2,0,0,Math.PI*2);ctx.fill();
+
+  ctx.globalAlpha=Math.max(0,1-turn*1.15);
+  ctx.beginPath();ctx.ellipse(farEyeX,eyeY,3.2,4.2,0,0,Math.PI*2);ctx.fill();
+  ctx.globalAlpha=1;
+
+  // Brows
+  ctx.strokeStyle="#555b57";
+  ctx.lineWidth=2.4;
+  ctx.beginPath();
+  ctx.moveTo(nearEyeX-side*6,eyeY-9);
+  ctx.quadraticCurveTo(nearEyeX,eyeY-13,nearEyeX+side*6,eyeY-10);
+  ctx.stroke();
+
+  ctx.globalAlpha=Math.max(0,1-turn*1.15);
+  ctx.beginPath();
+  ctx.moveTo(farEyeX+side*6,eyeY-9);
+  ctx.quadraticCurveTo(farEyeX,eyeY-13,farEyeX-side*6,eyeY-10);
+  ctx.stroke();
+  ctx.globalAlpha=1;
+
+  // Curved coral nose. As yaw approaches 90°, the tip reaches the face edge
+  // and the nose becomes a clear profile rather than a straight stick.
+  const noseRootX=featureX+side*2;
+  const noseRootY=featureY-3;
+  const noseTipX=cx+side*rx*(0.28+0.72*turn);
+  const noseTipY=featureY+5+pn*3;
+  ctx.strokeStyle="#ff8d63";
+  ctx.lineWidth=3.2;
+  ctx.beginPath();
+  ctx.moveTo(noseRootX,noseRootY-8);
+  ctx.quadraticCurveTo(
+    noseRootX+side*(7+8*turn),
+    noseRootY+2,
+    noseTipX,
+    noseTipY
+  );
+  ctx.quadraticCurveTo(
+    noseTipX-side*(2+3*turn),
+    noseTipY+5,
+    noseTipX-side*(7+5*turn),
+    noseTipY+5
+  );
+  ctx.stroke();
+
+  // Mouth follows the visible side of the face.
+  const mouthX=featureX+side*3*turn;
+  const mouthY=featureY+18;
+  ctx.strokeStyle="#555b57";
+  ctx.lineWidth=2.2;
+  ctx.beginPath();
+  ctx.moveTo(mouthX-side*8*(1-.35*turn),mouthY);
+  ctx.quadraticCurveTo(mouthX,mouthY+5,mouthX+side*9*(1-.15*turn),mouthY-1);
+  ctx.stroke();
+
+  // Small chin/profile cue at strong yaw.
+  if(turn>.55){
+    ctx.globalAlpha=(turn-.55)/.45;
+    ctx.strokeStyle="#686d69";
+    ctx.lineWidth=1.7;
+    ctx.beginPath();
+    ctx.moveTo(cx+side*rx*.58,cy+ry*.55);
+    ctx.quadraticCurveTo(cx+side*rx*.78,cy+ry*.67,cx+side*rx*.54,cy+ry*.78);
+    ctx.stroke();
+    ctx.globalAlpha=1;
+  }
 
   ctx.restore();
 }
@@ -1251,11 +1297,12 @@ function drawHeadingChart(chart) {
 
 
 function wirelessColor(value){
-  if(value === null || !Number.isFinite(value)) return "#969b98";
-  if(value >= 0.999) return "#176b3a";
-  if(value <= 0) return "#969b98";
-  if(value <= 1/3) return "#d32f2f";
-  return "#f57c00";
+  if(value === null || !Number.isFinite(value)) return "#9aa09c";
+  if(value >= 0.999) return "#154734";
+  if(value <= 0) return "#9aa09c";
+  if(value <= 1/3) return "#b23a2b";
+  if(value <= 2/3) return "#d97a2b";
+  return "#7fa66a";
 }
 
 function wirelessLabel(value){
@@ -1263,7 +1310,8 @@ function wirelessLabel(value){
   if(value >= 0.999) return "Good";
   if(value <= 0) return "No signal";
   if(value <= 1/3) return "Poor";
-  return "Reduced";
+  if(value <= 2/3) return "Reduced";
+  return "Good";
 }
 
 function drawWirelessStatus(chart){
@@ -1272,12 +1320,13 @@ function drawWirelessStatus(chart){
   const {ctx,w,h}=setupCanvas(canvas);
   ctx.clearRect(0,0,w,h);
 
-  const margin={l:54,r:15,t:22,b:31};
+  const margin={l:54,r:15,t:18,b:30};
   const pw=w-margin.l-margin.r;
-  const barY=margin.t+22;
-  const barH=Math.max(22,h-margin.t-margin.b-38);
   const [t0,t1]=state.domain;
   const x=t=>margin.l+((t-t0)/(t1-t0))*pw;
+
+  const barH=22;
+  const barY=Math.max(margin.t, Math.round((h-margin.b-barH)/2));
 
   drawBackgroundBands(ctx,margin.l,barY,pw,barH,x);
 
@@ -1293,36 +1342,58 @@ function drawWirelessStatus(chart){
     ctx.fillRect(x1,barY,Math.max(1,x2-x1+0.5),barH);
   }
 
-  ctx.strokeStyle="#c9cfcc";ctx.lineWidth=1;
+  ctx.strokeStyle="#c9cfcc";
+  ctx.lineWidth=1;
   ctx.strokeRect(margin.l,barY,pw,barH);
 
   const current=nearestRow(chart.rawRows,state.currentTime);
   const value=current?asNumber(current["Wireless Signal"]):null;
-  ctx.fillStyle=wirelessColor(value);
-  ctx.beginPath();ctx.arc(margin.l+8,14,5,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle="#18211b";ctx.font="700 12px system-ui";ctx.textAlign="left";ctx.textBaseline="middle";
-  ctx.fillText(`${wirelessLabel(value)}${value===null?"":` · ${value.toFixed(2)}`}`,margin.l+18,14);
 
-  ctx.fillStyle="#a8a8a8";ctx.font="11px system-ui";ctx.textAlign="center";ctx.textBaseline="top";
+  ctx.fillStyle="#6f7771";
+  ctx.font="11px system-ui";
+  ctx.textAlign="right";
+  ctx.textBaseline="middle";
+  ctx.fillText("Wireless",margin.l-8,barY+barH/2);
+
+  ctx.fillStyle=wirelessColor(value);
+  ctx.beginPath();
+  ctx.arc(margin.l+8,10,4.5,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle="#18211b";
+  ctx.font="700 11px system-ui";
+  ctx.textAlign="left";
+  ctx.textBaseline="middle";
+  ctx.fillText(`${wirelessLabel(value)}${value===null?"":` · ${value.toFixed(2)}`}`,margin.l+17,10);
+
+  ctx.fillStyle="#a8a8a8";
+  ctx.font="11px system-ui";
+  ctx.textAlign="center";
+  ctx.textBaseline="top";
   for(let i=0;i<=4;i++){
     const xx=margin.l+pw*i/4;
     const tt=t0+(t1-t0)*i/4;
-    ctx.fillText(formatClockShort(tt),xx,barY+barH+7);
+    ctx.fillText(formatClockShort(tt),xx,barY+barH+6);
   }
 
   const cursorX=x(state.currentTime);
   if(cursorX>=margin.l && cursorX<=margin.l+pw){
-    ctx.strokeStyle="#ff9364";ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(cursorX,barY-5);ctx.lineTo(cursorX,barY+barH+5);ctx.stroke();
-    // current-position box around the bar segment
-    ctx.strokeStyle="#18211b";ctx.lineWidth=2;
-    ctx.strokeRect(cursorX-4,barY-3,8,barH+6);
+    ctx.strokeStyle="#ff9364";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(cursorX,barY-4);
+    ctx.lineTo(cursorX,barY+barH+4);
+    ctx.stroke();
+
+    ctx.strokeStyle="#18211b";
+    ctx.lineWidth=1.5;
+    ctx.strokeRect(cursorX-3,barY-2,6,barH+4);
   }
 }
 
 
 function qualityColor(value) {
-  const colors = ["#969b98","#d32f2f","#f57c00","#9bd47f","#0f5f32"];
+  const colors = ["#969b98","#b23a2b","#d97a2b","#7fa66a","#154734"];
   const i = Math.max(0, Math.min(4, Math.round(value)));
   return colors[i];
 }
