@@ -85,7 +85,8 @@ h2 { margin: 2px 0 0; font-size: 1.15rem; }
 .peg::before { content: ""; position: absolute; bottom: 10px; width: 5px; height: 126px; background: #7a6246; border-radius: 4px 4px 0 0; z-index: 0; }
 .peg::after { content: ""; position: absolute; bottom: 4px; width: 88%; height: 8px; background: #7a6246; border-radius: 6px; z-index: 0; }
 .peg-label { position: absolute; bottom: -13px; font-weight: 800; color: var(--muted); }
-.disk { height: 18px; border-radius: 5px; margin-top: 2px; background: var(--green-2); border: 1px solid rgba(0,0,0,.08); z-index: 2; display: flex; align-items: center; justify-content: center; color: white; font-size: .67rem; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.disk {
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.18); height: 18px; border-radius: 5px; margin-top: 2px; background: var(--green-2); border: 1px solid rgba(0,0,0,.08); z-index: 2; display: flex; align-items: center; justify-content: center; color: white; font-size: .67rem; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 .disk.pending { outline: 3px solid rgba(217,169,40,.35); }
 .move-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; }
 .move-meta > div { display: flex; flex-direction: column; gap: 2px; }

@@ -10,7 +10,8 @@ const FILES = {
   trials: "trials.txt"
 };
 
-const COLORS = ["#ff9364", "#f2763f", "#f2f2f2", "#b8b8b8", "#d9653a", "#8f8f8f"];
+const COLORS = ["#154734", "#d9a928", "#477b9d", "#a44949", "#735b8f", "#5b7d64"];
+const DISK_COLORS = ["#ff9364", "#477b9d", "#d9a928", "#735b8f", "#5b7d64", "#a44949"];
 const MAX_DRAW_POINTS = 4200;
 const EXPERIMENT_PADDING_SECONDS = 60;
 const DISK_COUNT = 6; // The recorded move sequences solve a six-disk Tower of Hanoi.
@@ -288,7 +289,7 @@ function renderHanoi() {
     const disks = [...stack].reverse().map(d => {
       const width = 34 + (d / DISK_COUNT) * 58;
       const pending = ctx.move && peg === ctx.move.From && d === ctx.move.disk ? " pending" : "";
-      return `<div class="disk${pending}" style="width:${width}%" title="Disk ${d}">${d}</div>`;
+      return `<div class="disk${pending}" style="width:${width}%;background:${DISK_COLORS[(d - 1) % DISK_COLORS.length]}" title="Disk ${d}">${d}</div>`;
     }).join("");
     return `<div class="peg" data-peg="${peg}">${disks}<span class="peg-label">${peg}</span></div>`;
   }).join("");
