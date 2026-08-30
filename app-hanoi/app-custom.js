@@ -200,7 +200,7 @@ function chartForId(id) {
 }
 
 function ensureChartContextColumns() {
-  const contextIds = new Set(["affect","pad","eeg","deviceQuality","faceGroup"]);
+  const contextIds = new Set(["affect","pad","eeg","deviceQuality","wireless","faceGroup"]);
 
   for (const chart of state.charts) {
     if (!contextIds.has(chart.id)) continue;
@@ -424,7 +424,7 @@ function renderTrialCompletionSummary() {
 
 function renderAllContextCanvases() {
   for (const chart of state.charts) {
-    if (["affect","pad","eeg","deviceQuality","faceGroup"].includes(chart.id)) {
+    if (["affect","pad","eeg","deviceQuality","wireless","faceGroup"].includes(chart.id)) {
       drawContextCanvas(chart);
     }
   }
