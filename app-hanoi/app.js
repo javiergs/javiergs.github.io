@@ -11,7 +11,7 @@ const FILES = {
 };
 
 const COLORS = ["#154734", "#d9a928", "#477b9d", "#a44949", "#735b8f", "#5b7d64"];
-const DISK_COLORS = ["#ff9364", "#477b9d", "#d9a928", "#735b8f", "#5b7d64", "#a44949"];
+const DISK_COLORS = ["#BD8B13", "#477b9d", "#d9a928", "#735b8f", "#5b7d64", "#a44949"];
 const FACE_ACTION_COLORS = {
   neutral: "#9ca3a0",
   blink: "#0066ff",
@@ -44,7 +44,11 @@ const state = {
   chartMode: "raw",       // raw | smooth
   smoothSeconds: DEFAULT_SMOOTH_SECONDS,
   visibleSeries: {},
-  visibleFaceActions: {},
+  visibleFaceActions: {
+    eye: {},
+    upper: {},
+    lower: {}
+  },
   visibleQualityValues: {0:true,1:true,2:true,3:true,4:true}
 };
 
@@ -678,7 +682,7 @@ function installFaceCanvasClickHandlers(){
       const py=(event.clientY-rect.top)*sy/window.devicePixelRatio;
       for(const hit of chart._faceLegendHits||[]){
         if(px>=hit.x && px<=hit.x+hit.w && py>=hit.y && py<=hit.y+hit.h){
-          state.visibleFaceActions[hit.action]=state.visibleFaceActions[hit.action]===false;
+          toggleFaceAction(hit.actionKey,hit.action);
           drawAllCharts();
           break;
         }
@@ -843,7 +847,7 @@ function drawFaceLane(chart) {
 
   const cursorX = x(state.currentTime);
   if (cursorX >= margin.l && cursorX <= margin.l + pw) {
-    ctx.strokeStyle = "#ff9364";
+    ctx.strokeStyle = "#BD8B13";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(cursorX, margin.t);
@@ -853,6 +857,24 @@ function drawFaceLane(chart) {
 }
 
 
+
+function faceLaneKey(actionKey){
+  if(actionKey==="Action Eye") return "eye";
+  if(actionKey==="Action Upper Face") return "upper";
+  return "lower";
+}
+
+function isFaceActionVisible(actionKey,action){
+  const lane=faceLaneKey(actionKey);
+  const map=state.visibleFaceActions[lane] || {};
+  return map[action] !== false;
+}
+
+function toggleFaceAction(actionKey,action){
+  const lane=faceLaneKey(actionKey);
+  if(!state.visibleFaceActions[lane]) state.visibleFaceActions[lane]={};
+  state.visibleFaceActions[lane][action] = state.visibleFaceActions[lane][action] === false;
+}
 
 function faceLaneActions(rows,actionKey){
   const set=new Set();
@@ -949,7 +971,7 @@ function drawFaceGroup(chart){
       if(x2<=x1) continue;
 
       const action=normalizeFaceAction(r[lane.actionKey]);
-      if(state.visibleFaceActions[action]===false) continue;
+      if(!isFaceActionVisible(lane.actionKey,action)) continue;
 
       let power=lane.powerKey?asNumber(r[lane.powerKey]):1;
       if(power===null) power=0;
@@ -974,7 +996,7 @@ function drawFaceGroup(chart){
     ctx.textBaseline="middle";
 
     for(const action of actions){
-      const checked=state.visibleFaceActions[action]!==false;
+      const checked=isFaceActionVisible(lane.actionKey,action);
       const box=10;
       const labelW=ctx.measureText(action).width;
       const itemW=box+6+10+4+labelW+16;
@@ -1030,7 +1052,7 @@ function drawFaceGroup(chart){
 
   const cursorX=x(state.currentTime);
   if(cursorX>=rightX && cursorX<=rightX+rightW){
-    ctx.strokeStyle="#ff9364";
+    ctx.strokeStyle="#BD8B13";
     ctx.lineWidth=1.5;
     ctx.beginPath();
     ctx.moveTo(cursorX,top);
@@ -1052,7 +1074,7 @@ function drawFaceGroup(chart){
       const labelW=ctx.measureText(action).width;
       const itemW=box+6+10+4+labelW+16;
       if(lx+itemW>rightX+rightW) break;
-      chart._faceLegendHits.push({x:lx,y:legendY,w:itemW,h:14,action});
+      chart._faceLegendHits.push({x:lx,y:legendY,w:itemW,h:14,action,actionKey:lane.actionKey});
       lx+=itemW;
     }
   });
@@ -1139,7 +1161,7 @@ function drawExpressionFace(ctx,cx,cy,eyeAction,upperAction,lowerAction){
   ctx.stroke();
 
   // Nose.
-  ctx.strokeStyle="#ff9364";
+  ctx.strokeStyle="#BD8B13";
   ctx.lineWidth=2.6;
   ctx.beginPath();
   ctx.moveTo(cx,cy-2);ctx.quadraticCurveTo(cx+5,cy+3,cx+1,cy+10);ctx.stroke();
@@ -1329,7 +1351,7 @@ function drawMotionSummary(chart) {
   ctx.strokeStyle="#e1e5e2"; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(plot.x,plot.y+plot.h); ctx.lineTo(plot.x+plot.w,plot.y+plot.h); ctx.stroke();
 
-  ctx.strokeStyle="#ff9364"; ctx.lineWidth=2;
+  ctx.strokeStyle="#ff7f32"; ctx.lineWidth=2;
   ctx.beginPath();
   let started=false;
   for (const p of samples) {
@@ -1349,7 +1371,7 @@ function drawMotionSummary(chart) {
     // small current-value point
     if(currentMove!==null){
       const py=plot.y+plot.h-(Math.min(currentMove,maxV)/maxV)*plot.h;
-      ctx.fillStyle="#ff9364";
+      ctx.fillStyle="#BD8B13";
       ctx.beginPath(); ctx.arc(cursorX,py,4,0,Math.PI*2); ctx.fill();
     }
   }
@@ -1369,7 +1391,7 @@ function drawMotionSummary(chart) {
   if(heading!==null){
     const angle=(heading-90)*Math.PI/180;
     const ex=cx+Math.cos(angle)*radius*.76, ey=cy+Math.sin(angle)*radius*.76;
-    ctx.strokeStyle="#ff9364"; ctx.lineWidth=4; ctx.lineCap="round";
+    ctx.strokeStyle="#BD8B13"; ctx.lineWidth=4; ctx.lineCap="round";
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ex,ey); ctx.stroke();
     ctx.fillStyle="#18211b"; ctx.font="800 14px system-ui";
     ctx.fillText(compassDirection(heading),cx,cy+2);
@@ -1489,7 +1511,7 @@ function drawCartoonHead(ctx,cx,cy,yawDeg,pitchDeg){
   const noseRootY=featureY-3;
   const noseTipX=cx+side*rx*(0.28+0.72*turn);
   const noseTipY=featureY+5+pn*3;
-  ctx.strokeStyle="#ff8d63";
+  ctx.strokeStyle="#BD8B13";
   ctx.lineWidth=3.2;
   ctx.beginPath();
   ctx.moveTo(noseRootX,noseRootY-8);
@@ -1609,8 +1631,8 @@ function drawHeadingChart(chart) {
     const ex = cx + Math.cos(angle) * radius * .78;
     const ey = cy + Math.sin(angle) * radius * .78;
 
-    ctx.strokeStyle = "#ff9364";
-    ctx.fillStyle = "#ff9364";
+    ctx.strokeStyle = "#BD8B13";
+    ctx.fillStyle = "#BD8B13";
     ctx.lineWidth = 5;
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -1722,7 +1744,7 @@ function drawWirelessStatus(chart){
 
   const cursorX=x(state.currentTime);
   if(cursorX>=margin.l && cursorX<=margin.l+pw){
-    ctx.strokeStyle="#ff9364";
+    ctx.strokeStyle="#BD8B13";
     ctx.lineWidth=2;
     ctx.beginPath();
     ctx.moveTo(cursorX,barY-4);
@@ -1810,7 +1832,7 @@ function drawQualityLanes(chart) {
 
   const cursorX = x(state.currentTime);
   if (cursorX >= margin.l && cursorX <= margin.l + pw) {
-    ctx.strokeStyle = "#ff9364";
+    ctx.strokeStyle = "#BD8B13";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(cursorX, margin.t);
@@ -1876,7 +1898,7 @@ function drawQualityBars(chart) {
 
   const cursorX = x(state.currentTime);
   if (cursorX >= margin.l && cursorX <= margin.l + pw) {
-    ctx.strokeStyle = "#ff9364";
+    ctx.strokeStyle = "#BD8B13";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(cursorX, margin.t);
@@ -2138,7 +2160,7 @@ function drawChart(chart) {
 
   const cursorX=x(state.currentTime);
   if (cursorX>=margin.l && cursorX<=margin.l+pw) {
-    ctx.strokeStyle="#ff9364"; ctx.lineWidth=1.5;
+    ctx.strokeStyle="#BD8B13"; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.moveTo(cursorX,margin.t); ctx.lineTo(cursorX,margin.t+ph); ctx.stroke();
     const nr=nearestRow(displayRows,state.currentTime);
     keys.forEach((key,ki)=>{
@@ -2183,7 +2205,7 @@ function drawTrialStrip() {
       if(m._help){ const xx=x(m.start); if(xx>=left&&xx<=left+pw){ ctx.fillStyle="#f2763f"; ctx.fillRect(xx,top,2,ph); } }
     }
   }
-  const cx=x(state.currentTime); ctx.strokeStyle="#ff9364"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,2); ctx.lineTo(cx,h-3); ctx.stroke();
+  const cx=x(state.currentTime); ctx.strokeStyle="#BD8B13"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,2); ctx.lineTo(cx,h-3); ctx.stroke();
 }
 
 function updateAll() {

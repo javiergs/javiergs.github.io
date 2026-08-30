@@ -218,7 +218,7 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
 
 /* Current-time cursor uses blue-gray so it cannot be confused with orange Help markers. */
 .time-slider {
-  accent-color: #ff9364;
+  accent-color: #BD8B13;
 }
 
 /* CALHCI sage/forest palette for quality indicators. */
@@ -235,12 +235,12 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
   color: #26302a;
 }
 .quality-value-check input {
-  accent-color: #ff9364;
+  accent-color: #BD8B13;
 }
 
 
 .lab-logo {
-  background: #eef2ef;
+  background: #154734;
   padding: 3px;
   box-sizing: border-box;
 }
@@ -248,4 +248,13 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
 
 .face-group-wrap {
   height: 330px;
+}
+
+
+.site-footer {
+  margin: 22px auto 28px;
+  width: min(1180px, calc(100% - 32px));
+  color: #6b746e;
+  font-size: 13px;
+  text-align: center;
 }
