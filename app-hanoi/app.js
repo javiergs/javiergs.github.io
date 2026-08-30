@@ -10,8 +10,8 @@ const FILES = {
   trials: "trials.txt"
 };
 
-const COLORS = ["#154734", "#d9a928", "#477b9d", "#a44949", "#735b8f", "#5b7d64"];
-const DISK_COLORS = ["#ff9364", "#477b9d", "#d9a928", "#735b8f", "#5b7d64", "#a44949"];
+const COLORS = ["#226945", "#739f8d", "#477b9d", "#a44949", "#735b8f", "#496c5c"];
+const DISK_COLORS = ["#3f6e7d", "#477b9d", "#d9a928", "#735b8f", "#5b7d64", "#a44949"];
 const FACE_ACTION_COLORS = {
   neutral: "#9ca3a0",
   blink: "#0066ff",
@@ -43,7 +43,8 @@ const state = {
   lastFrame: null,
   chartMode: "raw",       // raw | smooth
   smoothSeconds: DEFAULT_SMOOTH_SECONDS,
-  visibleSeries: {}
+  visibleSeries: {},
+  visibleFaceActions: {}
 };
 
 const el = id => document.getElementById(id);
@@ -203,7 +204,7 @@ async function loadParticipant(id) {
     history.replaceState(null, "", url);
     updateAll();
     const totalRows = Object.values(state.data).reduce((n, rows) => n + rows.length, 0);
-    setStatus(`Participant ${id} loaded · ${state.trialGroups.length} trials · ${state.trials.length} moves · ${totalRows.toLocaleString()} sensor samples.`);
+    setStatus(`Participant ${id} loaded · ${state.trialGroups.length} trials · ${state.trials.length} moves · ${totalRows.toLocaleString()} sensor samples.  Orange markers = Help used · blue-gray line = current time.`);
   } catch (err) {
     console.error(err);
     setStatus(`Could not load participant ${id}: ${err.message}`, true);
@@ -424,7 +425,8 @@ function buildCharts() {
       note:"Insight sensor order: AF3 · T7 · Pz · T8 · AF4 · discrete 0–4 · no smoothing",
       keys:["Quality Sensor 0","Quality Sensor 1","Quality Sensor 2","Quality Sensor 3","Quality Sensor 4"],
       sensorLabels:["AF3","T7","Pz","T8","AF4"],
-      noSmooth:true
+      noSmooth:true,
+      selectable:true
     },
     {
       id:"wireless", source:"device", type:"wirelessStatus", title:"Device · Wireless Signal Quality",
@@ -435,7 +437,8 @@ function buildCharts() {
     {
       id:"faceGroup", source:"face", type:"faceGroup", title:"Facial Expression",
       note:"Current expression at left · Eye / Upper Face / Lower Face timelines at right",
-      keys:[]
+      keys:[],
+      selectableActions:true
     },
     {
       id:"motionSummary", source:"motion", type:"motionSummary", title:"Head Motion",
@@ -483,7 +486,26 @@ function buildCharts() {
   state.charts.forEach(chart => {
     const legend = el(`legend-${chart.id}`);
 
-    if (chart.type === "faceGroup" || chart.type === "faceCurrent") {
+    if (chart.type === "faceGroup") {
+      const actions = new Set();
+      for (const row of chart.rawRows) {
+        ["Action Eye","Action Upper Face","Action Lower Face"].forEach(key => {
+          const action = normalizeFaceAction(row[key]);
+          if (action) actions.add(action);
+        });
+      }
+      const sortedActions = [...actions].sort();
+      if (!Object.keys(state.visibleFaceActions).length) {
+        sortedActions.forEach(action => state.visibleFaceActions[action] = true);
+      }
+      legend.classList.add("selectable-legend");
+      legend.innerHTML = sortedActions.map(action =>
+        `<label class="series-check face-action-check" style="color:${faceActionColor(action)}">
+          <input type="checkbox" data-face-action="${escapeHTML(action)}" ${state.visibleFaceActions[action] !== false ? "checked" : ""}>
+          <span class="legend-swatch face-swatch"></span>${escapeHTML(action)}
+        </label>`
+      ).join("");
+    } else if (chart.type === "faceCurrent") {
       legend.innerHTML = "";
     } else if (chart.type === "faceLane") {
       const actions = new Set();
@@ -497,7 +519,14 @@ function buildCharts() {
     } else if (chart.type === "heading" || chart.type === "motionSummary" || chart.type === "wirelessStatus") {
       legend.innerHTML = "";
     } else if (chart.type === "qualityLanes") {
-      legend.innerHTML =
+      const sensorChecks = chart.keys.map((k,i) =>
+        `<label class="series-check">
+          <input type="checkbox" data-chart="${chart.id}" data-key="${escapeHTML(k)}" ${state.visibleSeries[chart.id][k] !== false ? "checked" : ""}>
+          ${escapeHTML(chart.sensorLabels[i])}
+        </label>`
+      ).join("");
+      legend.classList.add("selectable-legend");
+      legend.innerHTML = sensorChecks +
         `<span class="quality-key"><span class="quality-chip q0"></span>0</span>
          <span class="quality-key"><span class="quality-chip q1"></span>1</span>
          <span class="quality-key"><span class="quality-chip q2"></span>2</span>
@@ -517,11 +546,19 @@ function buildCharts() {
     }
   });
 
-  document.querySelectorAll(".series-check input").forEach(input => {
+  document.querySelectorAll(".series-check input[data-chart]").forEach(input => {
     input.addEventListener("change", event => {
       const chartId = event.currentTarget.dataset.chart;
       const key = event.currentTarget.dataset.key;
       state.visibleSeries[chartId][key] = event.currentTarget.checked;
+      drawAllCharts();
+    });
+  });
+
+  document.querySelectorAll(".face-action-check input").forEach(input => {
+    input.addEventListener("change", event => {
+      const action = event.currentTarget.dataset.faceAction;
+      state.visibleFaceActions[action] = event.currentTarget.checked;
       drawAllCharts();
     });
   });
@@ -805,7 +842,7 @@ function drawFaceLane(chart) {
 
   const cursorX = x(state.currentTime);
   if (cursorX >= margin.l && cursorX <= margin.l + pw) {
-    ctx.strokeStyle = "#ff9364";
+    ctx.strokeStyle = "#3f6e7d";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(cursorX, margin.t);
@@ -822,7 +859,7 @@ function drawFaceGroup(chart){
   const {ctx,w,h}=setupCanvas(canvas);
   ctx.clearRect(0,0,w,h);
 
-  const leftW=Math.min(180,Math.max(145,w*.14));
+  const leftW=Math.min(205,Math.max(170,w*.15));
   const gap=14;
   const faceBox={x:8,y:10,w:leftW-8,h:h-20};
   const plot={x:leftW+gap,y:16,w:w-leftW-gap-16,h:h-42};
@@ -846,7 +883,8 @@ function drawFaceGroup(chart){
   ctx.font="700 10px system-ui";
   ctx.textAlign="center";
   ctx.textBaseline="top";
-  ctx.fillText(`${eye} · ${upper} · ${lower}`,faceBox.x+faceBox.w/2,faceBox.y+faceBox.h-30);
+  ctx.font="700 9px system-ui";
+  ctx.fillText(`${eye} · ${upper} · ${lower}`,faceBox.x+faceBox.w/2,faceBox.y+faceBox.h-24);
 
   // Three categorical timelines on the right.
   const lanes=[
@@ -866,7 +904,7 @@ function drawFaceGroup(chart){
     ctx.font="11px system-ui";
     ctx.textAlign="right";
     ctx.textBaseline="middle";
-    ctx.fillText(label,plot.x-8,y0+laneH/2);
+    ctx.fillText(label,plot.x-14,y0+laneH/2);
 
     for(let i=0;i<rows.length;i++){
       const r=rows[i];
@@ -875,6 +913,7 @@ function drawFaceGroup(chart){
       const x2=Math.min(plot.x+plot.w,x(nextT));
       if(x2<=x1) continue;
       const action=normalizeFaceAction(r[actionKey]);
+      if(state.visibleFaceActions[action] === false) continue;
       let power=powerKey?asNumber(r[powerKey]):1;
       if(power===null) power=0;
       power=Math.max(0,Math.min(1,power));
@@ -905,7 +944,7 @@ function drawFaceGroup(chart){
 
   const cursorX=x(state.currentTime);
   if(cursorX>=plot.x && cursorX<=plot.x+plot.w){
-    ctx.strokeStyle="#ff9364";
+    ctx.strokeStyle="#3f6e7d";
     ctx.lineWidth=1.5;
     ctx.beginPath();
     ctx.moveTo(cursorX,plot.y);
@@ -994,7 +1033,7 @@ function drawExpressionFace(ctx,cx,cy,eyeAction,upperAction,lowerAction){
   ctx.stroke();
 
   // Nose.
-  ctx.strokeStyle="#ff9364";
+  ctx.strokeStyle="#3f6e7d";
   ctx.lineWidth=2.6;
   ctx.beginPath();
   ctx.moveTo(cx,cy-2);ctx.quadraticCurveTo(cx+5,cy+3,cx+1,cy+10);ctx.stroke();
@@ -1184,7 +1223,7 @@ function drawMotionSummary(chart) {
   ctx.strokeStyle="#e1e5e2"; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(plot.x,plot.y+plot.h); ctx.lineTo(plot.x+plot.w,plot.y+plot.h); ctx.stroke();
 
-  ctx.strokeStyle="#ff9364"; ctx.lineWidth=2;
+  ctx.strokeStyle="#3f6e7d"; ctx.lineWidth=2;
   ctx.beginPath();
   let started=false;
   for (const p of samples) {
@@ -1204,7 +1243,7 @@ function drawMotionSummary(chart) {
     // small current-value point
     if(currentMove!==null){
       const py=plot.y+plot.h-(Math.min(currentMove,maxV)/maxV)*plot.h;
-      ctx.fillStyle="#ff9364";
+      ctx.fillStyle="#3f6e7d";
       ctx.beginPath(); ctx.arc(cursorX,py,4,0,Math.PI*2); ctx.fill();
     }
   }
@@ -1224,7 +1263,7 @@ function drawMotionSummary(chart) {
   if(heading!==null){
     const angle=(heading-90)*Math.PI/180;
     const ex=cx+Math.cos(angle)*radius*.76, ey=cy+Math.sin(angle)*radius*.76;
-    ctx.strokeStyle="#ff9364"; ctx.lineWidth=4; ctx.lineCap="round";
+    ctx.strokeStyle="#3f6e7d"; ctx.lineWidth=4; ctx.lineCap="round";
     ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ex,ey); ctx.stroke();
     ctx.fillStyle="#18211b"; ctx.font="800 14px system-ui";
     ctx.fillText(compassDirection(heading),cx,cy+2);
@@ -1302,9 +1341,6 @@ function drawCartoonHead(ctx,cx,cy,yawDeg,pitchDeg){
   ctx.beginPath();
   ctx.ellipse(nearEarX,cy+2,6.5,12,0,0,Math.PI*2);
   ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(nearEarX-side*1.5,cy+2,3.3,-Math.PI/2,Math.PI/2);
-  ctx.stroke();
 
   ctx.globalAlpha=Math.max(.08,1-turn*1.18);
   ctx.beginPath();
@@ -1347,7 +1383,7 @@ function drawCartoonHead(ctx,cx,cy,yawDeg,pitchDeg){
   const noseRootY=featureY-3;
   const noseTipX=cx+side*rx*(0.28+0.72*turn);
   const noseTipY=featureY+5+pn*3;
-  ctx.strokeStyle="#ff8d63";
+  ctx.strokeStyle="#739f8d";
   ctx.lineWidth=3.2;
   ctx.beginPath();
   ctx.moveTo(noseRootX,noseRootY-8);
@@ -1467,8 +1503,8 @@ function drawHeadingChart(chart) {
     const ex = cx + Math.cos(angle) * radius * .78;
     const ey = cy + Math.sin(angle) * radius * .78;
 
-    ctx.strokeStyle = "#ff9364";
-    ctx.fillStyle = "#ff9364";
+    ctx.strokeStyle = "#3f6e7d";
+    ctx.fillStyle = "#3f6e7d";
     ctx.lineWidth = 5;
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -1500,11 +1536,11 @@ function drawHeadingChart(chart) {
 
 function wirelessColor(value){
   if(value === null || !Number.isFinite(value)) return "#9aa09c";
-  if(value >= 0.999) return "#154734";
+  if(value >= 0.999) return "#226945";
   if(value <= 0) return "#9aa09c";
   if(value <= 1/3) return "#b23a2b";
   if(value <= 2/3) return "#d97a2b";
-  return "#7fa66a";
+  return "#91b5a9";
 }
 
 function wirelessLabel(value){
@@ -1580,7 +1616,7 @@ function drawWirelessStatus(chart){
 
   const cursorX=x(state.currentTime);
   if(cursorX>=margin.l && cursorX<=margin.l+pw){
-    ctx.strokeStyle="#ff9364";
+    ctx.strokeStyle="#3f6e7d";
     ctx.lineWidth=2;
     ctx.beginPath();
     ctx.moveTo(cursorX,barY-4);
@@ -1595,7 +1631,7 @@ function drawWirelessStatus(chart){
 
 
 function qualityColor(value) {
-  const colors = ["#969b98","#b23a2b","#d97a2b","#7fa66a","#154734"];
+  const colors = ["#969b98","#b23a2b","#d97a2b","#91b5a9","#226945"];
   const i = Math.max(0, Math.min(4, Math.round(value)));
   return colors[i];
 }
@@ -1614,7 +1650,8 @@ function drawQualityLanes(chart) {
   const [t0,t1] = state.domain;
   const x = t => margin.l + ((t-t0)/(t1-t0))*pw;
   const labels = chart.sensorLabels || chart.keys;
-  const laneH = ph / chart.keys.length;
+  const visibleKeys = visibleChartKeys(chart);
+  const laneH = ph / Math.max(1, visibleKeys.length);
 
   if(insetW) drawChartInset(chart,ctx,8,margin.t,insetW-8,ph);
   drawBackgroundBands(ctx, margin.l, margin.t, pw, ph, x);
@@ -1622,13 +1659,14 @@ function drawQualityLanes(chart) {
   ctx.font = "11px system-ui";
   ctx.textBaseline = "middle";
 
-  chart.keys.forEach((key, laneIndex) => {
+  visibleKeys.forEach((key, laneIndex) => {
+    const originalIndex = chart.keys.indexOf(key);
     const y0 = margin.t + laneIndex * laneH;
     const centerY = y0 + laneH/2;
 
     ctx.fillStyle = "#a8a8a8";
     ctx.textAlign = "right";
-    ctx.fillText(labels[laneIndex], margin.l - 8, centerY);
+    ctx.fillText(labels[originalIndex], margin.l - 8, centerY);
 
     ctx.strokeStyle = "#686868";
     ctx.lineWidth = 1;
@@ -1647,7 +1685,7 @@ function drawQualityLanes(chart) {
     const x2 = Math.min(margin.l + pw, x(nextT));
     if (x2 <= x1) continue;
 
-    chart.keys.forEach((key, laneIndex) => {
+    visibleKeys.forEach((key, laneIndex) => {
       const value = asNumber(row[key]);
       if (value === null) return;
       const y0 = margin.t + laneIndex * laneH + 3;
@@ -1667,7 +1705,7 @@ function drawQualityLanes(chart) {
 
   const cursorX = x(state.currentTime);
   if (cursorX >= margin.l && cursorX <= margin.l + pw) {
-    ctx.strokeStyle = "#ff9364";
+    ctx.strokeStyle = "#3f6e7d";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(cursorX, margin.t);
@@ -1733,7 +1771,7 @@ function drawQualityBars(chart) {
 
   const cursorX = x(state.currentTime);
   if (cursorX >= margin.l && cursorX <= margin.l + pw) {
-    ctx.strokeStyle = "#ff9364";
+    ctx.strokeStyle = "#3f6e7d";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(cursorX, margin.t);
@@ -1925,10 +1963,10 @@ function drawEEGMapInset(chart,ctx,x,y,w,h){
   ctx.lineWidth=2;
   ctx.beginPath();ctx.arc(cmsX,cmsY,6,0,Math.PI*2);ctx.fill();ctx.stroke();
   ctx.fillStyle="#4f5752";
-  ctx.font="700 8px system-ui";
-  ctx.textAlign="right";
+  ctx.font="700 7px system-ui";
+  ctx.textAlign="left";
   ctx.textBaseline="middle";
-  ctx.fillText("CMS/DRL",cmsX-9,cmsY);
+  ctx.fillText("CMS/DRL",cmsX+8,cmsY);
 }
 
 function drawChart(chart) {
@@ -1995,7 +2033,7 @@ function drawChart(chart) {
 
   const cursorX=x(state.currentTime);
   if (cursorX>=margin.l && cursorX<=margin.l+pw) {
-    ctx.strokeStyle="#ff9364"; ctx.lineWidth=1.5;
+    ctx.strokeStyle="#3f6e7d"; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.moveTo(cursorX,margin.t); ctx.lineTo(cursorX,margin.t+ph); ctx.stroke();
     const nr=nearestRow(displayRows,state.currentTime);
     keys.forEach((key,ki)=>{
@@ -2033,14 +2071,14 @@ function drawTrialStrip() {
     const x1=Math.max(left,x(g.start)), x2=Math.min(left+pw,x(g.end));
     if(x2<=left||x1>=left+pw) continue;
     const active=state.currentTime>=g.start&&state.currentTime<=g.end;
-    ctx.fillStyle=active?"rgba(255,147,100,.72)":"rgba(120,120,120,.62)"; ctx.fillRect(x1,top,Math.max(2,x2-x1),ph);
+    ctx.fillStyle=active?"rgba(119,157,142,.78)":"rgba(120,120,120,.62)"; ctx.fillRect(x1,top,Math.max(2,x2-x1),ph);
     ctx.fillStyle=active?"#3f3f3f":"#f5f5f5"; ctx.font="bold 11px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle";
     if(x2-x1>45) ctx.fillText(`Trial ${g.trial}`,(x1+x2)/2,top+ph/2);
     for(const m of g.moves){
       if(m._help){ const xx=x(m.start); if(xx>=left&&xx<=left+pw){ ctx.fillStyle="#f2763f"; ctx.fillRect(xx,top,2,ph); } }
     }
   }
-  const cx=x(state.currentTime); ctx.strokeStyle="#ff9364"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,2); ctx.lineTo(cx,h-3); ctx.stroke();
+  const cx=x(state.currentTime); ctx.strokeStyle="#3f6e7d"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,2); ctx.lineTo(cx,h-3); ctx.stroke();
 }
 
 function updateAll() {
