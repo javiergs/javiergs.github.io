@@ -752,11 +752,6 @@ function surveyRatingScale(label, value, leftLabel, rightLabel, max=5) {
       <span class="survey-rating-dots" aria-label="${valid ? `${count} of ${max}` : "not available"}">${dots}</span>
       <span class="survey-rating-number">${valid ? `${count}/${max}` : "—"}</span>
     </div>
-    <div class="survey-scale-direction">
-      <span>${escapeHTML(leftLabel)}</span>
-      <span>1–${max}</span>
-      <span>${escapeHTML(rightLabel)}</span>
-    </div>
   </div>`;
 }
 
