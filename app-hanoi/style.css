@@ -17,9 +17,9 @@
   --help: #ff7a00;
   --danger: #d93025;
 
-  /* Quality-chart greens: stronger forest-green family */
-  --quality-good: #154734;
-  --quality-mid: #4f9d69;
+  /* Quality-chart greens: bright leaf/grass-green family */
+  --quality-good: #00b83f;
+  --quality-mid: #66d17a;
 
   --trial: rgba(127, 156, 143, 0.12);
   --active-trial: rgba(127, 156, 143, 0.22);
@@ -576,8 +576,8 @@ h2 {
 .quality-chip.q0 { background: #969b98; }
 .quality-chip.q1 { background: #d73027; }
 .quality-chip.q2 { background: #ff8c00; }
-.quality-chip.q3 { background: #4f9d69; }
-.quality-chip.q4 { background: #154734; }
+.quality-chip.q3 { background: #66d17a; }
+.quality-chip.q4 { background: #00b83f; }
 
 .face-action-check { text-transform: lowercase; }
 
