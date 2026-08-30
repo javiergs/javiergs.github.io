@@ -20,6 +20,23 @@
     'const DISK_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9"];'
   );
 
+  // Quality charts: move good/high values to a stronger forest-green family.
+  // These replacements cover the common greens used by earlier AppHanoi builds.
+  const qualityGreenReplacements = new Map([
+    ["#193e2c", "#154734"],
+    ["#1b5e20", "#154734"],
+    ["#1f6b45", "#154734"],
+    ["#2e7d32", "#154734"],
+    ["#388e3c", "#1f6f46"],
+    ["#7bc96f", "#4f9d69"],
+    ["#66bb6a", "#4f9d69"],
+    ["#4caf50", "#3f8f5b"]
+  ]);
+  for (const [from, to] of qualityGreenReplacements) {
+    source = source.replaceAll(from, to);
+    source = source.replaceAll(from.toUpperCase(), to.toUpperCase());
+  }
+
   // The footer no longer shows a participant ID. Remove the stale assignment if present.
   source = source.replace(
     /el\("footerParticipant"\)\.textContent\s*=\s*`Participant \$\{id\}`;\s*/,

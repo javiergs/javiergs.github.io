@@ -17,6 +17,10 @@
   --help: #ff7a00;
   --danger: #d93025;
 
+  /* Quality-chart greens: stronger forest-green family */
+  --quality-good: #154734;
+  --quality-mid: #4f9d69;
+
   --trial: rgba(127, 156, 143, 0.12);
   --active-trial: rgba(127, 156, 143, 0.22);
   --outside: rgba(56, 77, 66, 0.04);
@@ -572,8 +576,8 @@ h2 {
 .quality-chip.q0 { background: #969b98; }
 .quality-chip.q1 { background: #d73027; }
 .quality-chip.q2 { background: #ff8c00; }
-.quality-chip.q3 { background: #7bc96f; }
-.quality-chip.q4 { background: #193e2c; }
+.quality-chip.q3 { background: #4f9d69; }
+.quality-chip.q4 { background: #154734; }
 
 .face-action-check { text-transform: lowercase; }
 
