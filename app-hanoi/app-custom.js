@@ -417,37 +417,31 @@ function currentOrNearestTrialGroup(t) {
 function renderTrialCompletionSummary() {
   const box=el("trialCompletionSummary");
   if(!box) return;
+
   const g=currentOrNearestTrialGroup(state.currentTime);
-  if(!g){ box.innerHTML='<div class="summary-kicker">Session</div><div class="summary-percent">—</div>'; return; }
+  if(!g){
+    box.innerHTML='<div class="summary-kicker">Session</div><div class="summary-percent">—</div>';
+    return;
+  }
 
   const completed=g.moves.filter(m=>m.end<=state.currentTime).length;
   const trialPercent=Math.round(completed/Math.max(1,g.moves.length)*100);
   const help=g.moves.filter(m=>m.end<=state.currentTime && m._help).length;
 
-  // Determine current puzzle state using the trial rows already parsed by app.js.
-  let pegs=null;
-  try {
-    const active=g.moves.find(m=>state.currentTime>=m.start && state.currentTime<m.end);
-    const done=[...g.moves].reverse().find(m=>m.end<=state.currentTime);
-    const move=active || done || g.moves[0];
-    const raw=active
-      ? (move.before ?? move.beforeState ?? move._before)
-      : (done ? (move.after ?? move.afterState ?? move._after)
-              : (move.before ?? move.beforeState ?? move._before));
-
-    if(Array.isArray(raw)) pegs=raw;
-    else if(raw && Array.isArray(raw.pegs)) pegs=raw.pegs;
-    else if(typeof raw==="string"){
-      const groups=raw.match(/\[[^\]]*\]/g);
-      if(groups && groups.length>=3)
-        pegs=groups.slice(0,3).map(x=>(x.match(/\d+/g)||[]).map(Number));
-    }
-  } catch(e){ console.warn("Game completion unavailable",e); }
-
-  const diskCount=pegs ? (pegs.reduce((n,p)=>n+p.length,0)||6) : 6;
-  const rightCount=pegs && pegs[2] ? pegs[2].length : 0;
-  const gamePercent=Math.round(rightCount/diskCount*100);
-  const solved=gamePercent===100;
+  /*
+   * Use app.js's authoritative Hanoi state calculation.
+   * currentTrialContext() already handles:
+   *   - before a move
+   *   - during a move (BEFORE state)
+   *   - after a completed move
+   *   - between trials (previous trial's final state)
+   *   - after all trials
+   */
+  const hanoi = currentTrialContext(state.currentTime);
+  const rightCount = hanoi.poles && hanoi.poles.C ? hanoi.poles.C.length : 0;
+  const diskCount = (typeof DISK_COUNT !== "undefined" && DISK_COUNT) ? DISK_COUNT : 6;
+  const gamePercent = Math.round(rightCount / diskCount * 100);
+  const solved = rightCount === diskCount;
 
   box.innerHTML=
     `<div class="summary-kicker">Trial ${g.trial}</div>`+
