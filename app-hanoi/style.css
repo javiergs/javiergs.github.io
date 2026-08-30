@@ -4,9 +4,9 @@
   --ink: #18211b;
   --muted: #667068;
   --line: #dfe5e1;
-  --green: #496c5c;
-  --green-2: #226945;
-  --gold: #7fa692;
+  --green: #ff9364;
+  --green-2: #2d6b55;
+  --gold: #f2763f;
   --danger: #f2763f;
   --trial: rgba(119, 157, 142, 0.10);
   --active-trial: rgba(119, 157, 142, 0.20);
@@ -26,7 +26,7 @@ body {
 button, select, input { font: inherit; }
 
 .site-header {
-  background: #779d8e;
+  background: #4f5552;
   color: white;
   padding: 24px clamp(18px, 4vw, 54px);
   display: flex;
@@ -217,14 +217,22 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
 
 /* Current-time cursor uses blue-gray so it cannot be confused with orange Help markers. */
 .time-slider {
-  accent-color: #3f6e7d;
+  accent-color: #ff9364;
 }
 
 /* CALHCI sage/forest palette for quality indicators. */
-.quality-chip.q3 { background: #91b5a9; }
-.quality-chip.q4 { background: #226945; }
+.quality-chip.q3 { background: #9bd47f; }
+.quality-chip.q4 { background: #154734; }
 
 /* Give categorical face and sensor checkboxes some breathing room. */
 .face-action-check {
   text-transform: lowercase;
+}
+
+
+.quality-value-check {
+  color: #26302a;
+}
+.quality-value-check input {
+  accent-color: #ff9364;
 }
