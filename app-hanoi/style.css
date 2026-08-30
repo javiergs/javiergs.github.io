@@ -992,45 +992,11 @@ h2 {
   }
 }
 
-/* Survey wording refinement */
-.survey-response-label {
-  margin-top: 11px;
-  color: #6d7771;
-  font-size: .69rem;
-  font-weight: 850;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
 
-.survey-response-label + .survey-quote {
-  margin-top: 5px;
-}
-
-.survey-rating-block + .survey-rating-block {
-  margin-top: 10px;
-}
-
-.survey-scale-direction {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 8px;
-  margin: 2px 35px 0 min(45%, 180px);
-  color: var(--muted);
-  font-size: .61rem;
-  line-height: 1.2;
-}
-
-.survey-scale-direction span:nth-child(2) {
-  text-align: center;
-  font-weight: 750;
-}
-
-.survey-scale-direction span:last-child {
-  text-align: right;
-}
-
-@media (max-width: 600px) {
-  .survey-scale-direction {
-    margin-left: 0;
-  }
-}
+/* Game Completion appears below Trial Progress in the Master Timeline summary. */
+.game-completion-block { width:100%; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); text-align:center; }
+.game-completion-label { color:var(--muted); font-size:.61rem; font-weight:850; letter-spacing:.08em; }
+.game-completion-percent { margin-top:3px; color:var(--brand-deep); font-size:1.25rem; line-height:1.05; font-weight:850; font-variant-numeric:tabular-nums; }
+.game-completion-detail { margin-top:3px; color:#59635d; font-size:.66rem; }
+.game-completion-block.solved .game-completion-percent,
+.game-completion-block.solved .game-completion-detail { color:var(--quality-4); font-weight:800; }
