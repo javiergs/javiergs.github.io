@@ -199,8 +199,23 @@ function chartForId(id) {
   return state.charts.find(c => c.id === id) || null;
 }
 
+
+function placeBatteryBelowWireless() {
+  const wirelessCanvas = el("chart-wireless");
+  const batteryCanvas = el("chart-battery");
+  if (!wirelessCanvas || !batteryCanvas) return;
+
+  const wirelessCard = wirelessCanvas.closest(".chart-card");
+  const batteryCard = batteryCanvas.closest(".chart-card");
+  if (!wirelessCard || !batteryCard) return;
+
+  if (wirelessCard.nextElementSibling !== batteryCard) {
+    wirelessCard.insertAdjacentElement("afterend", batteryCard);
+  }
+}
+
 function ensureChartContextColumns() {
-  const contextIds = new Set(["affect","pad","eeg","deviceQuality","wireless","faceGroup"]);
+  const contextIds = new Set(["affect","pad","eeg","deviceQuality","wireless","battery","faceGroup"]);
 
   for (const chart of state.charts) {
     if (!contextIds.has(chart.id)) continue;
@@ -436,6 +451,7 @@ function renderAllContextCanvases() {
 const appOriginalUpdateAll = updateAll;
 updateAll = function() {
   ensureMasterTimelineColumns();
+  placeBatteryBelowWireless();
   ensureChartContextColumns();
   appOriginalUpdateAll();
   renderTrialCompletionSummary();
@@ -449,6 +465,7 @@ window.addEventListener("resize",()=>{
   if (!state || !state.charts) return;
   requestAnimationFrame(()=>{
     ensureMasterTimelineColumns();
+    placeBatteryBelowWireless();
     ensureChartContextColumns();
     drawAllCharts();
     drawTrialStrip();
@@ -462,6 +479,7 @@ window.addEventListener("resize",()=>{
 requestAnimationFrame(()=>{
   try {
     ensureMasterTimelineColumns();
+    placeBatteryBelowWireless();
     ensureChartContextColumns();
     drawAllCharts();
     drawTrialStrip();
