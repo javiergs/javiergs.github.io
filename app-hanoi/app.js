@@ -345,6 +345,17 @@ function snapshotValue(row, key, digits=2) {
   return s || "—";
 }
 
+function latestRowAtOrBefore(rows,time){
+  if(!rows || !rows.length) return null;
+  let lo=0, hi=rows.length-1, best=-1;
+  while(lo<=hi){
+    const mid=(lo+hi)>>1;
+    if(rows[mid]._t<=time){ best=mid; lo=mid+1; }
+    else hi=mid-1;
+  }
+  return best>=0 ? rows[best] : null;
+}
+
 function snapshotAffectValue(row,key,digits=2){
   if(!row) return "—";
   const activeKey = `Active ${key}`;
@@ -422,24 +433,9 @@ function buildCharts() {
       noSmooth:true
     },
     {
-      id:"faceCurrent", source:"face", type:"faceCurrent", title:"Facial Expression · Current",
-      note:"Current eye, upper-face, and lower-face actions at the master cursor",
+      id:"faceGroup", source:"face", type:"faceGroup", title:"Facial Expression",
+      note:"Current expression at left · Eye / Upper Face / Lower Face timelines at right",
       keys:[]
-    },
-    {
-      id:"faceEye", source:"face", type:"faceLane", title:"Facial Expression · Eyes",
-      note:"Eye action category by color",
-      actionKey:"Action Eye", powerKey:null
-    },
-    {
-      id:"faceUpper", source:"face", type:"faceLane", title:"Facial Expression · Upper Face",
-      note:"Upper-face action by color · power by intensity",
-      actionKey:"Action Upper Face", powerKey:"Power Upper Face"
-    },
-    {
-      id:"faceLower", source:"face", type:"faceLane", title:"Facial Expression · Lower Face",
-      note:"Lower-face action by color · power by intensity",
-      actionKey:"Action Lower Face", powerKey:"Power Lower Face"
     },
     {
       id:"motionSummary", source:"motion", type:"motionSummary", title:"Head Motion",
@@ -458,6 +454,7 @@ function buildCharts() {
     `<article class="card chart-card">
       <div class="chart-title-row"><h2>${c.title}</h2><div class="chart-note">${c.note}</div></div>
       <div class="chart-wrap${
+        c.type === "faceGroup" ? " face-group-wrap" :
         c.type === "faceCurrent" ? " face-current-wrap" :
         c.type === "faceLane" ? " face-single-wrap" :
         c.type === "heading" ? " heading-chart-wrap" :
@@ -486,7 +483,7 @@ function buildCharts() {
   state.charts.forEach(chart => {
     const legend = el(`legend-${chart.id}`);
 
-    if (chart.type === "faceCurrent") {
+    if (chart.type === "faceGroup" || chart.type === "faceCurrent") {
       legend.innerHTML = "";
     } else if (chart.type === "faceLane") {
       const actions = new Set();
@@ -603,7 +600,7 @@ function buildSmoothedRows(chart, windowSeconds) {
 }
 
 function processedChartRows(chart) {
-  if (chart.type === "wirelessStatus" || chart.type === "motionSummary" || chart.type === "faceCurrent" || chart.type === "faceLane" || chart.type === "qualityLanes" || chart.type === "heading" || chart.noSmooth || state.chartMode !== "smooth") return chart.rows;
+  if (chart.type === "wirelessStatus" || chart.type === "motionSummary" || chart.type === "faceGroup" || chart.type === "faceGroup" || chart.type === "faceCurrent" || chart.type === "faceLane" || chart.type === "qualityLanes" || chart.type === "heading" || chart.noSmooth || state.chartMode !== "smooth") return chart.rows;
 
   if (chart.smoothCacheSeconds !== state.smoothSeconds || !chart.smoothRows) {
     chart.smoothRows = buildSmoothedRows(chart, state.smoothSeconds);
@@ -625,7 +622,7 @@ function refreshChartModeUI() {
     const note = card ? card.querySelector(".chart-note") : null;
     if (!note) return;
 
-    if (chart.type === "wirelessStatus" || chart.type === "motionSummary" || chart.type === "faceCurrent" || chart.type === "faceLane" || chart.type === "qualityLanes") {
+    if (chart.type === "wirelessStatus" || chart.type === "motionSummary" || chart.type === "faceGroup" || chart.type === "faceGroup" || chart.type === "faceCurrent" || chart.type === "faceLane" || chart.type === "qualityLanes") {
       note.textContent = chart.note;
       return;
     }
@@ -819,13 +816,111 @@ function drawFaceLane(chart) {
 
 
 
+function drawFaceGroup(chart){
+  const canvas=el(`chart-${chart.id}`);
+  if(!canvas) return;
+  const {ctx,w,h}=setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+
+  const leftW=Math.min(180,Math.max(145,w*.14));
+  const gap=14;
+  const faceBox={x:8,y:10,w:leftW-8,h:h-20};
+  const plot={x:leftW+gap,y:16,w:w-leftW-gap-16,h:h-42};
+  const [t0,t1]=state.domain;
+  const x=t=>plot.x+((t-t0)/(t1-t0))*plot.w;
+
+  // Current-expression square
+  ctx.fillStyle="#fbfcfb";
+  ctx.strokeStyle="#d6ddd8";
+  ctx.lineWidth=1.2;
+  roundRect(ctx,faceBox.x,faceBox.y,faceBox.w,faceBox.h,10);
+  ctx.fill();ctx.stroke();
+
+  const row=latestRowAtOrBefore(chart.rawRows,state.currentTime);
+  const eye=normalizeFaceAction(row?row["Action Eye"]:"neutral");
+  const upper=normalizeFaceAction(row?row["Action Upper Face"]:"neutral");
+  const lower=normalizeFaceAction(row?row["Action Lower Face"]:"neutral");
+  drawExpressionFace(ctx,faceBox.x+faceBox.w/2,faceBox.y+faceBox.h*.44,eye,upper,lower);
+
+  ctx.fillStyle="#18211b";
+  ctx.font="700 10px system-ui";
+  ctx.textAlign="center";
+  ctx.textBaseline="top";
+  ctx.fillText(`${eye} · ${upper} · ${lower}`,faceBox.x+faceBox.w/2,faceBox.y+faceBox.h-30);
+
+  // Three categorical timelines on the right.
+  const lanes=[
+    ["Eyes","Action Eye",null],
+    ["Upper Face","Action Upper Face","Power Upper Face"],
+    ["Lower Face","Action Lower Face","Power Lower Face"]
+  ];
+  const laneH=plot.h/3;
+
+  drawBackgroundBands(ctx,plot.x,plot.y,plot.w,plot.h,x);
+
+  lanes.forEach(([label,actionKey,powerKey],li)=>{
+    const y0=plot.y+li*laneH;
+    const rows=chart.rows.filter(r=>r._t>=t0-1 && r._t<=t1+1);
+
+    ctx.fillStyle="#7e8781";
+    ctx.font="11px system-ui";
+    ctx.textAlign="right";
+    ctx.textBaseline="middle";
+    ctx.fillText(label,plot.x-8,y0+laneH/2);
+
+    for(let i=0;i<rows.length;i++){
+      const r=rows[i];
+      const nextT=i+1<rows.length?rows[i+1]._t:r._t+.1;
+      const x1=Math.max(plot.x,x(r._t));
+      const x2=Math.min(plot.x+plot.w,x(nextT));
+      if(x2<=x1) continue;
+      const action=normalizeFaceAction(r[actionKey]);
+      let power=powerKey?asNumber(r[powerKey]):1;
+      if(power===null) power=0;
+      power=Math.max(0,Math.min(1,power));
+      const alpha=action==="neutral"?.16:(powerKey?.35+.65*power:.88);
+      ctx.globalAlpha=alpha;
+      ctx.fillStyle=faceActionColor(action);
+      ctx.fillRect(x1,y0+4,Math.max(1,x2-x1+.5),Math.max(4,laneH-8));
+    }
+    ctx.globalAlpha=1;
+
+    ctx.strokeStyle="#d4d9d6";
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(plot.x,y0+laneH);
+    ctx.lineTo(plot.x+plot.w,y0+laneH);
+    ctx.stroke();
+  });
+
+  ctx.fillStyle="#a8a8a8";
+  ctx.font="11px system-ui";
+  ctx.textAlign="center";
+  ctx.textBaseline="top";
+  for(let i=0;i<=4;i++){
+    const xx=plot.x+plot.w*i/4;
+    const tt=t0+(t1-t0)*i/4;
+    ctx.fillText(formatClockShort(tt),xx,plot.y+plot.h+6);
+  }
+
+  const cursorX=x(state.currentTime);
+  if(cursorX>=plot.x && cursorX<=plot.x+plot.w){
+    ctx.strokeStyle="#ff9364";
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(cursorX,plot.y);
+    ctx.lineTo(cursorX,plot.y+plot.h);
+    ctx.stroke();
+  }
+}
+
 function drawFaceCurrent(chart){
   const canvas=el(`chart-${chart.id}`);
   if(!canvas) return;
   const {ctx,w,h}=setupCanvas(canvas);
   ctx.clearRect(0,0,w,h);
 
-  const row=nearestRow(chart.rawRows,state.currentTime);
+  const row=latestRowAtOrBefore(chart.rawRows,state.currentTime);
   const eye=normalizeFaceAction(row?row["Action Eye"]:"neutral");
   const upper=normalizeFaceAction(row?row["Action Upper Face"]:"neutral");
   const lower=normalizeFaceAction(row?row["Action Lower Face"]:"neutral");
@@ -1453,7 +1548,7 @@ function drawWirelessStatus(chart){
   ctx.lineWidth=1;
   ctx.strokeRect(margin.l,barY,pw,barH);
 
-  const current=nearestRow(chart.rawRows,state.currentTime);
+  const current=latestRowAtOrBefore(chart.rawRows,state.currentTime);
   const value=current?asNumber(current["Wireless Signal"]):null;
 
   ctx.fillStyle="#6f7771";
@@ -1512,13 +1607,16 @@ function drawQualityLanes(chart) {
   const {ctx,w,h} = setupCanvas(canvas);
   ctx.clearRect(0,0,w,h);
 
-  const margin = {l:54,r:15,t:12,b:26};
+  const insetW=chartInsetWidth(chart,w);
+  const insetGap=insetW?14:0;
+  const margin = {l:54+insetW+insetGap,r:15,t:12,b:26};
   const pw = w-margin.l-margin.r, ph = h-margin.t-margin.b;
   const [t0,t1] = state.domain;
   const x = t => margin.l + ((t-t0)/(t1-t0))*pw;
   const labels = chart.sensorLabels || chart.keys;
   const laneH = ph / chart.keys.length;
 
+  if(insetW) drawChartInset(chart,ctx,8,margin.t,insetW-8,ph);
   drawBackgroundBands(ctx, margin.l, margin.t, pw, ph, x);
 
   ctx.font = "11px system-ui";
@@ -1645,7 +1743,7 @@ function drawQualityBars(chart) {
 }
 
 function chartInsetWidth(chart,w){
-  if(["affect","pad","eeg"].includes(chart.id)) return Math.min(165, Math.max(125, w*0.12));
+  if(["affect","pad","eeg","deviceQuality"].includes(chart.id)) return Math.min(165, Math.max(125, w*0.12));
   return 0;
 }
 
@@ -1660,10 +1758,11 @@ function drawChartInset(chart,ctx,x,y,w,h){
   if(chart.id==="affect") drawAffectInset(chart,ctx,x,y,w,h);
   else if(chart.id==="pad") drawPADInset(chart,ctx,x,y,w,h);
   else if(chart.id==="eeg") drawEEGMapInset(chart,ctx,x,y,w,h);
+  else if(chart.id==="deviceQuality") drawContactQualityInset(chart,ctx,x,y,w,h);
 }
 
 function currentValidAffect(chart){
-  const row=nearestRow(chart.rawRows,state.currentTime);
+  const row=latestRowAtOrBefore(chart.rawRows,state.currentTime);
   if(!row) return [];
   return chart.keys.map((key,i)=>{
     const value=chartValue(chart,row,key);
@@ -1707,7 +1806,7 @@ function drawAffectInset(chart,ctx,x,y,w,h){
 }
 
 function drawPADInset(chart,ctx,x,y,w,h){
-  const row=nearestRow(chart.rawRows,state.currentTime);
+  const row=latestRowAtOrBefore(chart.rawRows,state.currentTime);
   const keys=["Pleasure","Arousal","Dominance"];
   const vals=keys.map(k=>row?asNumber(row[k]):null).map(v=>v===null?0:Math.max(-1,Math.min(1,v)));
 
@@ -1763,6 +1862,28 @@ function drawPADInset(chart,ctx,x,y,w,h){
   ctx.fillText(`P ${vals[0].toFixed(2)} · A ${vals[1].toFixed(2)} · D ${vals[2].toFixed(2)}`,x+w/2,y+h-8);
 }
 
+function drawContactQualityInset(chart,ctx,x,y,w,h){
+  const row=latestRowAtOrBefore(chart.rawRows,state.currentTime);
+  const overall=row?asNumber(row["Overall Quality"]):null;
+
+  ctx.fillStyle="#778078";
+  ctx.font="700 10px system-ui";
+  ctx.textAlign="center";
+  ctx.textBaseline="top";
+  ctx.fillText("OVERALL QUALITY",x+w/2,y+10);
+
+  ctx.fillStyle="#154734";
+  ctx.font="800 30px system-ui";
+  ctx.textBaseline="middle";
+  ctx.fillText(overall===null?"—":overall.toFixed(0),x+w/2,y+h*.47);
+
+  ctx.fillStyle="#778078";
+  ctx.font="10px system-ui";
+  ctx.textBaseline="top";
+  ctx.fillText("aggregate headset quality",x+w/2,y+h*.62);
+  ctx.fillText("from EMOTIV device stream",x+w/2,y+h*.62+14);
+}
+
 function drawEEGMapInset(chart,ctx,x,y,w,h){
   ctx.fillStyle="#778078";
   ctx.font="700 10px system-ui";
@@ -1795,11 +1916,25 @@ function drawEEGMapInset(chart,ctx,x,y,w,h){
     ctx.fillStyle="#26302a";ctx.font="700 9px system-ui";ctx.textAlign="center";ctx.textBaseline="bottom";
     ctx.fillText(label,sx,sy-9);
   }
+
+  // CMS/DRL reference location on Insight: near T7, shown only as a marker
+  // because this recording does not expose a separate contact-quality value for it.
+  const cmsX=cx-rx*.82, cmsY=cy+ry*.18;
+  ctx.fillStyle="#fbfcfb";
+  ctx.strokeStyle="#4f5752";
+  ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(cmsX,cmsY,6,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#4f5752";
+  ctx.font="700 8px system-ui";
+  ctx.textAlign="right";
+  ctx.textBaseline="middle";
+  ctx.fillText("CMS/DRL",cmsX-9,cmsY);
 }
 
 function drawChart(chart) {
   if (chart.type === "wirelessStatus") { drawWirelessStatus(chart); return; }
   if (chart.type === "motionSummary") { drawMotionSummary(chart); return; }
+  if (chart.type === "faceGroup") { drawFaceGroup(chart); return; }
   if (chart.type === "faceCurrent") { drawFaceCurrent(chart); return; }
   if (chart.type === "faceLane") { drawFaceLane(chart); return; }
   if (chart.type === "heading") { drawHeadingChart(chart); return; }
