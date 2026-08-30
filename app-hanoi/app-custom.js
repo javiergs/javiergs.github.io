@@ -414,6 +414,103 @@ function currentOrNearestTrialGroup(t) {
   return state.trialGroups[state.trialGroups.length-1];
 }
 
+/* ---------- Exact six-disk Hanoi distance-to-goal ---------- */
+
+const HANOI_PROGRESS_DISKS = 6;
+const HANOI_OPTIMAL_START_DISTANCE = (1 << HANOI_PROGRESS_DISKS) - 1; // 63
+
+let hanoiGoalDistances = null;
+
+function hanoiStateKeyFromPoles(poles) {
+  // Encode each disk by its pole (A=0, B=1, C=2).
+  // Disk labels in the dashboard are 1..6.
+  const pos = new Array(HANOI_PROGRESS_DISKS + 1).fill(0);
+  ["A","B","C"].forEach((poleName,poleIndex)=>{
+    const stack = poles?.[poleName] || [];
+    for (const disk of stack) {
+      const d = Number(disk);
+      if (d >= 1 && d <= HANOI_PROGRESS_DISKS) pos[d] = poleIndex;
+    }
+  });
+  return pos.slice(1).join("");
+}
+
+function hanoiPolesFromKey(key) {
+  const poles=[[],[],[]];
+  for(let d=HANOI_PROGRESS_DISKS; d>=1; d--){
+    const pole=Number(key[d-1]);
+    poles[pole].push(d);
+  }
+  return poles;
+}
+
+function hanoiNeighborKeys(key) {
+  const poles=hanoiPolesFromKey(key);
+  const result=[];
+
+  for(let from=0; from<3; from++){
+    if(!poles[from].length) continue;
+    const disk=poles[from][poles[from].length-1];
+
+    for(let to=0; to<3; to++){
+      if(to===from) continue;
+      const targetTop=poles[to].length ? poles[to][poles[to].length-1] : Infinity;
+      if(disk < targetTop){
+        const next=key.split("");
+        next[disk-1]=String(to);
+        result.push(next.join(""));
+      }
+    }
+  }
+  return result;
+}
+
+function buildHanoiGoalDistances() {
+  if(hanoiGoalDistances) return hanoiGoalDistances;
+
+  const goal="2".repeat(HANOI_PROGRESS_DISKS);
+  const dist=new Map([[goal,0]]);
+  const queue=[goal];
+
+  for(let qi=0; qi<queue.length; qi++){
+    const key=queue[qi];
+    const d=dist.get(key);
+    for(const next of hanoiNeighborKeys(key)){
+      if(!dist.has(next)){
+        dist.set(next,d+1);
+        queue.push(next);
+      }
+    }
+  }
+
+  hanoiGoalDistances=dist;
+  return dist;
+}
+
+function hanoiProgressAtCursor() {
+  const context=currentTrialContext(state.currentTime);
+  const poles=context?.poles || {A:[],B:[],C:[]};
+  const key=hanoiStateKeyFromPoles(poles);
+  const distances=buildHanoiGoalDistances();
+  const remaining=distances.get(key);
+
+  if(!Number.isFinite(remaining)){
+    return {percent:0, remaining:null, solved:false};
+  }
+
+  /*
+   * Completion is state-based, not move-count based:
+   * 0% = the six-disk starting configuration (63 optimal moves away)
+   * 100% = solved
+   * Moving backward can reduce the percentage.
+   */
+  const percent=Math.max(0,Math.min(100,
+    Math.round((1 - remaining/HANOI_OPTIMAL_START_DISTANCE)*100)
+  ));
+
+  return {percent, remaining, solved:remaining===0};
+}
+
 function renderTrialCompletionSummary() {
   const box=el("trialCompletionSummary");
   if(!box) return;
@@ -424,34 +521,42 @@ function renderTrialCompletionSummary() {
     return;
   }
 
-  const completed=g.moves.filter(m=>m.end<=state.currentTime).length;
-  const trialPercent=Math.round(completed/Math.max(1,g.moves.length)*100);
+  const completedMoves=g.moves.filter(m=>m.end<=state.currentTime).length;
+  const totalMoves=Math.max(1,g.moves.length);
+  const trialPercent=Math.max(0,Math.min(100,
+    Math.round(completedMoves/totalMoves*100)
+  ));
   const help=g.moves.filter(m=>m.end<=state.currentTime && m._help).length;
 
-  /*
-   * Use app.js's authoritative Hanoi state calculation.
-   * currentTrialContext() already handles:
-   *   - before a move
-   *   - during a move (BEFORE state)
-   *   - after a completed move
-   *   - between trials (previous trial's final state)
-   *   - after all trials
-   */
-  const hanoi = currentTrialContext(state.currentTime);
-  const rightCount = hanoi.poles && hanoi.poles.C ? hanoi.poles.C.length : 0;
-  const diskCount = (typeof DISK_COUNT !== "undefined" && DISK_COUNT) ? DISK_COUNT : 6;
-  const gamePercent = Math.round(rightCount / diskCount * 100);
-  const solved = rightCount === diskCount;
+  const game=hanoiProgressAtCursor();
+
+  // Efficiency is meaningful only once the puzzle has actually been solved.
+  const efficiency = game.solved && completedMoves>0
+    ? Math.min(100,Math.round(HANOI_OPTIMAL_START_DISTANCE/completedMoves*100))
+    : null;
+
+  let gameDetail="";
+  if(game.solved){
+    gameDetail=
+      `<div class="game-completion-detail">${completedMoves} moves used</div>`+
+      `<div class="game-completion-detail">${efficiency}% move efficiency</div>`+
+      `<div class="game-completion-detail">${help} help request${help===1?"":"s"}</div>`;
+  }else{
+    gameDetail=
+      `<div class="game-completion-detail">${game.remaining===null ? "—" : game.remaining} optimal moves remaining</div>`+
+      `<div class="game-completion-detail">${completedMoves} moves used</div>`+
+      `<div class="game-completion-detail">${help} help request${help===1?"":"s"}</div>`;
+  }
 
   box.innerHTML=
     `<div class="summary-kicker">Trial ${g.trial}</div>`+
     `<div class="summary-percent">${trialPercent}%</div>`+
     `<div class="summary-label">trial progress</div>`+
-    `<div class="summary-meta">${completed} / ${g.moves.length} moves<br>${help} help request${help===1?"":"s"}</div>`+
-    `<div class="game-completion-block${solved?" solved":""}">`+
+    `<div class="summary-meta">${completedMoves} / ${g.moves.length} moves<br>${help} help request${help===1?"":"s"}</div>`+
+    `<div class="game-completion-block${game.solved?" solved":""}">`+
       `<div class="game-completion-label">GAME COMPLETION</div>`+
-      `<div class="game-completion-percent">${gamePercent}%</div>`+
-      `<div class="game-completion-detail">${rightCount} / ${diskCount} disks on right${solved?" · SOLVED":""}</div>`+
+      `<div class="game-completion-percent">${game.percent}%${game.solved?" · SOLVED":""}</div>`+
+      gameDetail+
     `</div>`;
 }
 
