@@ -1,220 +1,473 @@
 "use strict";
 
 /*
-  AppHanoi direct UI refinements.
-  Loaded after app.js so the dashboard keeps its existing data-processing logic.
+ * AppHanoi 2026-08-30 refinements
+ *
+ * - Restores the original Head Motion / Head Orientation drawing from app.js:
+ *   this file DOES NOT override drawCartoonHead().
+ * - Facial Expression laugh uses one clean rotated-D mouth.
+ * - Time plots occupy a common left column; current/context boxes are on right.
+ * - Master Timeline gets a Trial Completion summary box.
+ * - Quality 4 is bright leaf green; quality 3 is lighter green.
+ * - EEG sensor inset dots reflect current contact quality.
+ */
 
-  Changes:
-  1. Bright leaf/grass-green contact and wireless quality palette.
-  2. EEG head-map sensor dots show CURRENT contact quality at the master cursor.
-  3. Head-orientation cartoon uses a simple D-shaped mouth.
-*/
+/* ---------- Bright quality status palette ---------- */
 
-function qualityColor(value) {
-  // 0 gray, 1 red, 2 orange, 3 medium forest, 4 deep forest
+qualityColor = function(value) {
   const colors = ["#969b98", "#d32f2f", "#f57c00", "#66d17a", "#00b83f"];
   const i = Math.max(0, Math.min(4, Math.round(value)));
   return colors[i];
-}
+};
 
-function wirelessColor(value) {
+wirelessColor = function(value) {
   if (value === null || !Number.isFinite(value)) return "#969b98";
-  if (value >= 0.999) return "#00b83f";  // excellent / bright quality green
+  if (value >= 0.999) return "#00b83f";
   if (value <= 0) return "#969b98";
   if (value <= 1/3) return "#d32f2f";
   if (value <= 2/3) return "#f57c00";
-  return "#66d17a";                      // good / lighter quality green
-}
+  return "#66d17a";
+};
 
-function drawEEGMapInset(chart, ctx, x, y, w, h) {
+/* ---------- Keep chart insets OUT of the time plot itself ---------- */
+
+chartInsetWidth = function(chart, w) {
+  return 0;
+};
+
+/* ---------- EEG context head: dots follow current contact quality ---------- */
+
+drawEEGMapInset = function(chart, ctx, x, y, w, h) {
   ctx.fillStyle = "#778078";
   ctx.font = "700 10px system-ui";
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillText("INSIGHT SENSORS", x + w/2, y + 9);
+  ctx.fillText("INSIGHT SENSORS", x+w/2, y+9);
 
-  const cx = x + w/2, cy = y + h*.56;
-  const rx = Math.min(w*.34, 48), ry = Math.min(h*.33, 55);
+  const cx=x+w/2, cy=y+h*.56;
+  const rx=Math.min(w*.34,48), ry=Math.min(h*.33,55);
 
-  // Top view of head, nose at top.
-  ctx.strokeStyle = "#8c9690";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle="#8c9690";
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); ctx.stroke();
   ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
-  ctx.stroke();
+  ctx.moveTo(cx-6,cy-ry+1); ctx.lineTo(cx,cy-ry-8); ctx.lineTo(cx+6,cy-ry+1); ctx.stroke();
 
-  ctx.beginPath();
-  ctx.moveTo(cx-6, cy-ry+1);
-  ctx.lineTo(cx,   cy-ry-8);
-  ctx.lineTo(cx+6, cy-ry+1);
-  ctx.stroke();
-
-  // Sensor positions and their corresponding EMOTIV device quality fields.
   const pts = {
-    AF3: {p:[-.35,-.58], q:"Quality Sensor 0"},
-    AF4: {p:[ .35,-.58], q:"Quality Sensor 4"},
-    T7:  {p:[-.78,-.12], q:"Quality Sensor 1"},
-    T8:  {p:[ .78,-.12], q:"Quality Sensor 3"},
-    Pz:  {p:[ 0, .62],   q:"Quality Sensor 2"}
+    AF3:{p:[-.35,-.58], q:"Quality Sensor 0"},
+    AF4:{p:[ .35,-.58], q:"Quality Sensor 4"},
+    T7 :{p:[-.78,-.12], q:"Quality Sensor 1"},
+    T8 :{p:[ .78,-.12], q:"Quality Sensor 3"},
+    Pz :{p:[ 0,.62],    q:"Quality Sensor 2"}
   };
 
-  // Contact quality comes from the device stream, not the EEG-value stream.
   const qualityRow = latestRowAtOrBefore(state.data.device || [], state.currentTime);
 
-  for (const [label, def] of Object.entries(pts)) {
-    const [px, py] = def.p;
-    const sx = cx + px*rx, sy = cy + py*ry;
-    const q = qualityRow ? asNumber(qualityRow[def.q]) : null;
+  for (const [label,def] of Object.entries(pts)) {
+    const [px,py] = def.p;
+    const sx=cx+px*rx, sy=cy+py*ry;
+    const q=qualityRow ? asNumber(qualityRow[def.q]) : null;
 
-    ctx.fillStyle = q === null ? "#c8cfcb" : qualityColor(q);
-    ctx.beginPath();
-    ctx.arc(sx, sy, 7, 0, Math.PI*2);
-    ctx.fill();
+    ctx.fillStyle = q===null ? "#c8cfcb" : qualityColor(q);
+    ctx.beginPath(); ctx.arc(sx,sy,7,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle="#38413c"; ctx.lineWidth=1.4; ctx.stroke();
 
-    ctx.strokeStyle = q === null ? "#8c9690" : "#26302a";
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
-
-    ctx.fillStyle = "#26302a";
-    ctx.font = "700 9px system-ui";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(label, sx, sy-9);
+    ctx.fillStyle="#26302a";
+    ctx.font="700 9px system-ui";
+    ctx.textAlign="center";
+    ctx.textBaseline="bottom";
+    ctx.fillText(label,sx,sy-9);
   }
 
-  // CMS/DRL is a reference marker; this recording has no separate CQ value for it.
-  const cmsX = cx-rx*.82, cmsY = cy+ry*.18;
-  ctx.fillStyle = "#fbfcfb";
-  ctx.strokeStyle = "#4f5752";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cmsX, cmsY, 6, 0, Math.PI*2);
-  ctx.fill();
-  ctx.stroke();
+  const cmsX=cx-rx*.82, cmsY=cy+ry*.18;
+  ctx.fillStyle="#fbfcfb";
+  ctx.strokeStyle="#4f5752";
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(cmsX,cmsY,6,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle="#4f5752";
+  ctx.font="700 7px system-ui";
+  ctx.textAlign="left";
+  ctx.textBaseline="middle";
+  ctx.fillText("CMS/DRL",cmsX+8,cmsY);
+};
 
-  ctx.fillStyle = "#4f5752";
-  ctx.font = "700 7px system-ui";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText("CMS/DRL", cmsX+8, cmsY);
-}
+/* ---------- Facial Expression only: replace laugh with a D-shaped mouth ---------- */
 
-function drawCartoonHead(ctx, cx, cy, yawDeg, pitchDeg) {
-  const yaw = Math.max(-90, Math.min(90, yawDeg));
-  const pitch = Math.max(-45, Math.min(45, pitchDeg));
-  const yn = yaw/90;
-  const pn = pitch/45;
-  const turn = Math.abs(yn);
-  const side = yn >= 0 ? 1 : -1;
-
-  const rx = 40*(1-0.28*turn);
-  const ry = 48*(1-0.06*Math.abs(pn));
-  const featureX = cx + yn*rx*0.42;
-  const featureY = cy + pn*10;
-
+drawExpressionFace = function(ctx,cx,cy,eyeAction,upperAction,lowerAction) {
   ctx.save();
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
+  ctx.lineCap="round";
+  ctx.lineJoin="round";
 
-  // Head.
-  ctx.fillStyle = "#fbfbfa";
-  ctx.strokeStyle = "#555b57";
-  ctx.lineWidth = 2.6;
+  ctx.fillStyle="#fbfcfb";
+  ctx.strokeStyle="#66706a";
+  ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.ellipse(cx,cy,44,52,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+
+  ctx.beginPath(); ctx.ellipse(cx-46,cy,6,11,0,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(cx+46,cy,6,11,0,0,Math.PI*2); ctx.stroke();
+
+  const leftX=cx-15,rightX=cx+15,eyeY=cy-10;
+  const lookLeft=eyeAction==="lookl";
+  const lookRight=eyeAction==="lookr";
+  const blink=eyeAction==="blink";
+  const winkL=eyeAction==="winkl";
+  const winkR=eyeAction==="winkr";
+
+  ctx.strokeStyle="#424a45";
+  ctx.fillStyle="#424a45";
+  ctx.lineWidth=2.5;
+
+  const drawEye=(x,isClosed)=>{
+    if(isClosed){
+      ctx.beginPath(); ctx.moveTo(x-7,eyeY); ctx.quadraticCurveTo(x,eyeY+3,x+7,eyeY); ctx.stroke();
+    }else{
+      ctx.beginPath(); ctx.ellipse(x,eyeY,7,4.5,0,0,Math.PI*2); ctx.stroke();
+      const pupilShift=lookLeft?-3:lookRight?3:0;
+      ctx.beginPath(); ctx.arc(x+pupilShift,eyeY,2.2,0,Math.PI*2); ctx.fill();
+    }
+  };
+  drawEye(leftX,blink||winkL);
+  drawEye(rightX,blink||winkR);
+
+  let browLift=0,browInner=0;
+  if(upperAction==="surprise") browLift=-8;
+  if(upperAction==="frown") browInner=5;
   ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
-  ctx.fill();
+  ctx.moveTo(leftX-8,eyeY-10+browLift);
+  ctx.lineTo(leftX+8,eyeY-10+browLift+browInner);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(rightX-8,eyeY-10+browLift+browInner);
+  ctx.lineTo(rightX+8,eyeY-10+browLift);
   ctx.stroke();
 
-  // Ears.
-  const nearEarX = cx + side*(rx+2);
-  const farEarX = cx - side*(rx+2);
-  ctx.strokeStyle = "#686d69";
-  ctx.lineWidth = 2.2;
-
-  ctx.globalAlpha = 0.95;
+  ctx.strokeStyle="#BD8B13";
+  ctx.lineWidth=2.6;
   ctx.beginPath();
-  ctx.ellipse(nearEarX, cy+2, 6.5, 12, 0, 0, Math.PI*2);
-  ctx.stroke();
+  ctx.moveTo(cx,cy-2); ctx.quadraticCurveTo(cx+5,cy+3,cx+1,cy+10); ctx.stroke();
 
-  ctx.globalAlpha = Math.max(.08, 1-turn*1.18);
-  ctx.beginPath();
-  ctx.ellipse(farEarX, cy+2, 6.5, 12, 0, 0, Math.PI*2);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+  ctx.strokeStyle="#424a45";
+  ctx.fillStyle="#424a45";
+  ctx.lineWidth=2.6;
+  const my=cy+24;
 
-  // Eyes.
-  const eyeSep = 12*(1-.64*turn);
-  const eyeY = featureY-8;
-  const nearEyeX = featureX + side*eyeSep;
-  const farEyeX = featureX - side*eyeSep;
-
-  ctx.fillStyle = "#4e5450";
-  ctx.beginPath();
-  ctx.ellipse(nearEyeX, eyeY, 3.2, 4.2, 0, 0, Math.PI*2);
-  ctx.fill();
-
-  ctx.globalAlpha = Math.max(0,1-turn*1.15);
-  ctx.beginPath();
-  ctx.ellipse(farEyeX, eyeY, 3.2, 4.2, 0, 0, Math.PI*2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  // Brows.
-  ctx.strokeStyle = "#555b57";
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.moveTo(nearEyeX-side*6, eyeY-9);
-  ctx.quadraticCurveTo(nearEyeX, eyeY-13, nearEyeX+side*6, eyeY-10);
-  ctx.stroke();
-
-  ctx.globalAlpha = Math.max(0,1-turn*1.15);
-  ctx.beginPath();
-  ctx.moveTo(farEyeX+side*6, eyeY-9);
-  ctx.quadraticCurveTo(farEyeX, eyeY-13, farEyeX-side*6, eyeY-10);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-
-  // Curved gold nose.
-  const noseRootX = featureX + side*2;
-  const noseRootY = featureY - 3;
-  const noseTipX = cx + side*rx*(0.28+0.72*turn);
-  const noseTipY = featureY + 5 + pn*3;
-
-  ctx.strokeStyle = "#BD8B13";
-  ctx.lineWidth = 3.2;
-  ctx.beginPath();
-  ctx.moveTo(noseRootX, noseRootY-8);
-  ctx.quadraticCurveTo(
-    noseRootX+side*(7+8*turn),
-    noseRootY+2,
-    noseTipX,
-    noseTipY
-  );
-  ctx.quadraticCurveTo(
-    noseTipX-side*(2+3*turn),
-    noseTipY+5,
-    noseTipX-side*(7+5*turn),
-    noseTipY+5
-  );
-  ctx.stroke();
-
-  // Simple D-shaped mouth: one straight edge + one smooth curved edge.
-  // It mirrors with head direction instead of looking like an oval plus chin line.
-  const mouthX = featureX + side*3*turn;
-  const mouthY = featureY + 19;
-  const flatX = mouthX - side*6;
-  const topY = mouthY - 4;
-  const bottomY = mouthY + 4;
-  const curveX = mouthX + side*8;
-
-  ctx.strokeStyle = "#555b57";
-  ctx.lineWidth = 2.3;
-  ctx.beginPath();
-  ctx.moveTo(flatX, topY);
-  ctx.lineTo(flatX, bottomY);
-  ctx.quadraticCurveTo(curveX, bottomY+1, curveX, mouthY);
-  ctx.quadraticCurveTo(curveX, topY-1, flatX, topY);
-  ctx.stroke();
+  if(lowerAction==="laugh"){
+    // A single open mouth: rotated D shape, no extra oval/chin line.
+    ctx.save();
+    ctx.translate(cx,my);
+    ctx.rotate(Math.PI/2);
+    ctx.beginPath();
+    ctx.moveTo(-7,-10);
+    ctx.lineTo(7,-10);
+    ctx.bezierCurveTo(14,-10,14,10,0,12);
+    ctx.bezierCurveTo(-14,10,-14,-10,-7,-10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }else if(lowerAction==="smile"){
+    ctx.beginPath(); ctx.arc(cx,my-4,15,0.12*Math.PI,0.88*Math.PI); ctx.stroke();
+  }else if(lowerAction==="smirkright"){
+    ctx.beginPath();
+    ctx.moveTo(cx-12,my); ctx.quadraticCurveTo(cx+3,my+3,cx+14,my-6); ctx.stroke();
+  }else{
+    ctx.beginPath(); ctx.moveTo(cx-11,my); ctx.quadraticCurveTo(cx,my+1,cx+11,my); ctx.stroke();
+  }
 
   ctx.restore();
+};
+
+/* ---------- DOM layout helpers ---------- */
+
+function ensureMasterTimelineColumns() {
+  const card = document.querySelector(".timeline-card");
+  if (!card || card.classList.contains("aligned-timeline")) return;
+
+  const main = document.createElement("div");
+  main.className = "timeline-main";
+  while (card.firstChild) main.appendChild(card.firstChild);
+
+  const summary = document.createElement("aside");
+  summary.className = "timeline-summary";
+  summary.id = "trialCompletionSummary";
+
+  card.appendChild(main);
+  card.appendChild(summary);
+  card.classList.add("aligned-timeline");
 }
+
+function chartForId(id) {
+  return state.charts.find(c => c.id === id) || null;
+}
+
+function ensureChartContextColumns() {
+  const contextIds = new Set(["affect","pad","eeg","deviceQuality","faceGroup"]);
+
+  for (const chart of state.charts) {
+    if (!contextIds.has(chart.id)) continue;
+
+    const canvas = el(`chart-${chart.id}`);
+    if (!canvas) continue;
+    const card = canvas.closest(".chart-card");
+    if (!card || card.classList.contains("has-context-column")) continue;
+
+    const context = document.createElement("div");
+    context.className = "chart-context";
+    context.dataset.chartId = chart.id;
+
+    const sideCanvas = document.createElement("canvas");
+    sideCanvas.id = `context-${chart.id}`;
+    context.appendChild(sideCanvas);
+
+    card.appendChild(context);
+    card.classList.add("has-context-column");
+  }
+}
+
+function drawContextCanvas(chart) {
+  const canvas = el(`context-${chart.id}`);
+  if (!canvas) return;
+  const {ctx,w,h}=setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+
+  if (chart.id === "faceGroup") {
+    const row=latestRowAtOrBefore(chart.rawRows,state.currentTime);
+    const eye=normalizeFaceAction(row?row["Action Eye"]:"neutral");
+    const upper=normalizeFaceAction(row?row["Action Upper Face"]:"neutral");
+    const lower=normalizeFaceAction(row?row["Action Lower Face"]:"neutral");
+
+    ctx.fillStyle="#778078";
+    ctx.font="700 10px system-ui";
+    ctx.textAlign="center";
+    ctx.textBaseline="top";
+    ctx.fillText("CURRENT EXPRESSION",w/2,10);
+
+    drawExpressionFace(ctx,w/2,h*.47,eye,upper,lower);
+
+    ctx.fillStyle="#18211b";
+    ctx.font="700 9px system-ui";
+    ctx.textAlign="center";
+    ctx.textBaseline="bottom";
+    ctx.fillText(`${eye} · ${upper} · ${lower}`,w/2,h-12);
+    return;
+  }
+
+  drawChartInset(chart,ctx,1,1,w-2,h-2);
+}
+
+/* ---------- Facial-expression timeline, now plot-only in the left column ---------- */
+
+drawFaceGroup = function(chart){
+  const canvas=el(`chart-${chart.id}`);
+  if(!canvas) return;
+  const {ctx,w,h}=setupCanvas(canvas);
+  ctx.clearRect(0,0,w,h);
+
+  const left=54, right=15;
+  const plotX=left;
+  const plotW=Math.max(10,w-left-right);
+  const [t0,t1]=state.domain;
+  const x=t=>plotX+((t-t0)/(t1-t0))*plotW;
+
+  const laneDefs=[
+    {title:"EYES", actionKey:"Action Eye", powerKey:null},
+    {title:"UPPER FACE", actionKey:"Action Upper Face", powerKey:"Power Upper Face"},
+    {title:"LOWER FACE", actionKey:"Action Lower Face", powerKey:"Power Lower Face"}
+  ];
+
+  const top=10;
+  const bottom=24;
+  const laneBlockH=(h-top-bottom)/3;
+  const titleH=18;
+  const legendH=22;
+  const barH=Math.max(28,laneBlockH-titleH-legendH-8);
+
+  drawBackgroundBands(ctx,plotX,top,plotW,h-top-bottom,x);
+
+  chart._faceLegendHits=[];
+
+  laneDefs.forEach((lane,li)=>{
+    const blockY=top+li*laneBlockH;
+    const titleY=blockY+2;
+    const barY=blockY+titleH;
+    const legendY=barY+barH+4;
+
+    ctx.fillStyle="#657069";
+    ctx.font="800 11px system-ui";
+    ctx.textAlign="left";
+    ctx.textBaseline="top";
+    ctx.fillText(lane.title,plotX,titleY);
+
+    const rows=chart.rawRows.filter(r=>r._t>=t0-2 && r._t<=t1+2);
+    for(let i=0;i<rows.length;i++){
+      const r=rows[i];
+      const nextT=i+1<rows.length?rows[i+1]._t:r._t+.05;
+      const x1=Math.max(plotX,x(r._t));
+      const x2=Math.min(plotX+plotW,x(nextT));
+      if(x2<=x1) continue;
+
+      const action=normalizeFaceAction(r[lane.actionKey]);
+      if(!isFaceActionVisible(lane.actionKey,action)) continue;
+
+      let power=lane.powerKey?asNumber(r[lane.powerKey]):1;
+      if(power===null) power=0;
+      power=Math.max(0,Math.min(1,power));
+      const alpha=action==="neutral"?.16:(lane.powerKey?.35+.65*power:.88);
+
+      ctx.globalAlpha=alpha;
+      ctx.fillStyle=faceActionColor(action);
+      ctx.fillRect(x1,barY,Math.max(1,x2-x1+.5),barH);
+    }
+    ctx.globalAlpha=1;
+
+    ctx.strokeStyle="#d4d9d6";
+    ctx.lineWidth=1;
+    ctx.strokeRect(plotX,barY,plotW,barH);
+
+    const actions=faceLaneActions(chart.rawRows,lane.actionKey);
+    let lx=plotX;
+    ctx.font="10px system-ui";
+    ctx.textAlign="left";
+    ctx.textBaseline="middle";
+
+    for(const action of actions){
+      const checked=isFaceActionVisible(lane.actionKey,action);
+      const box=10;
+      const labelW=ctx.measureText(action).width;
+      const itemW=box+6+10+4+labelW+16;
+      if(lx+itemW>plotX+plotW) break;
+
+      ctx.fillStyle="#ffffff";
+      ctx.strokeStyle="#66706a";
+      ctx.lineWidth=1.1;
+      ctx.strokeRect(lx,legendY,box,box);
+      if(checked){
+        ctx.fillStyle="#18211b";
+        ctx.fillRect(lx+2,legendY+2,box-4,box-4);
+      }
+
+      ctx.fillStyle=faceActionColor(action);
+      ctx.fillRect(lx+box+6,legendY+1,10,8);
+
+      ctx.fillStyle="#4d5651";
+      ctx.fillText(action,lx+box+20,legendY+box/2);
+
+      chart._faceLegendHits.push({x:lx,y:legendY,w:itemW,h:14,action,actionKey:lane.actionKey});
+      lx+=itemW;
+    }
+
+    if(li<laneDefs.length-1){
+      ctx.strokeStyle="#e3e6e4";
+      ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(plotX,blockY+laneBlockH-2);
+      ctx.lineTo(plotX+plotW,blockY+laneBlockH-2);
+      ctx.stroke();
+    }
+  });
+
+  ctx.fillStyle="#a8a8a8";
+  ctx.font="11px system-ui";
+  ctx.textAlign="center";
+  ctx.textBaseline="top";
+  for(let i=0;i<=4;i++){
+    const xx=plotX+plotW*i/4;
+    const tt=t0+(t1-t0)*i/4;
+    ctx.fillText(formatClockShort(tt),xx,h-19);
+  }
+
+  const cursorX=x(state.currentTime);
+  if(cursorX>=plotX && cursorX<=plotX+plotW){
+    ctx.strokeStyle="#BD8B13";
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(cursorX,top);
+    ctx.lineTo(cursorX,h-bottom);
+    ctx.stroke();
+  }
+};
+
+/* ---------- Trial completion summary ---------- */
+
+function currentOrNearestTrialGroup(t) {
+  if (!state.trialGroups.length) return null;
+  const active=state.trialGroups.find(g=>t>=g.start && t<=g.end);
+  if(active) return active;
+  if(t<state.trialGroups[0].start) return state.trialGroups[0];
+  for(let i=0;i<state.trialGroups.length-1;i++){
+    if(t>state.trialGroups[i].end && t<state.trialGroups[i+1].start) return state.trialGroups[i];
+  }
+  return state.trialGroups[state.trialGroups.length-1];
+}
+
+function renderTrialCompletionSummary() {
+  const box=el("trialCompletionSummary");
+  if(!box) return;
+
+  const g=currentOrNearestTrialGroup(state.currentTime);
+  if(!g){
+    box.innerHTML='<div class="summary-kicker">Session</div><div class="summary-percent">—</div><div class="summary-label">no trial data</div>';
+    return;
+  }
+
+  const completed=g.moves.filter(m=>m.end<=state.currentTime).length;
+  const total=Math.max(1,g.moves.length);
+  const percent=Math.max(0,Math.min(100,Math.round(completed/total*100)));
+  const help=g.moves.filter(m=>m.end<=state.currentTime && m._help).length;
+  const done=percent===100;
+
+  box.innerHTML=
+    `<div class="summary-kicker">Trial ${g.trial}</div>`+
+    `<div class="summary-percent${done?" summary-complete":""}">${percent}%</div>`+
+    `<div class="summary-label">completed</div>`+
+    `<div class="summary-meta">${completed} / ${g.moves.length} moves<br>${help} help request${help===1?"":"s"}</div>`;
+}
+
+function renderAllContextCanvases() {
+  for (const chart of state.charts) {
+    if (["affect","pad","eeg","deviceQuality","faceGroup"].includes(chart.id)) {
+      drawContextCanvas(chart);
+    }
+  }
+}
+
+/* The original app's render/update loop remains authoritative. We only wrap it
+   to ensure the two-column structure exists before drawing and refresh the
+   contextual column after the normal charts are rendered. */
+const appOriginalUpdateAll = updateAll;
+updateAll = function() {
+  ensureMasterTimelineColumns();
+  ensureChartContextColumns();
+  appOriginalUpdateAll();
+  renderTrialCompletionSummary();
+  renderAllContextCanvases();
+};
+
+/* buildCharts recreates cards, so after each rebuild the next updateAll call
+   reconstructs the right-side context column automatically. */
+
+window.addEventListener("resize",()=>{
+  if (!state || !state.charts) return;
+  requestAnimationFrame(()=>{
+    ensureMasterTimelineColumns();
+    ensureChartContextColumns();
+    drawAllCharts();
+    drawTrialStrip();
+    renderTrialCompletionSummary();
+    renderAllContextCanvases();
+  });
+});
+
+/* If the main app already completed its first render before this script loaded,
+   immediately apply the refinement. */
+requestAnimationFrame(()=>{
+  try {
+    ensureMasterTimelineColumns();
+    ensureChartContextColumns();
+    drawAllCharts();
+    drawTrialStrip();
+    renderTrialCompletionSummary();
+    renderAllContextCanvases();
+  } catch (e) {
+    console.warn("AppHanoi refinement deferred until participant data loads.", e);
+  }
+});

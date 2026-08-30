@@ -622,3 +622,140 @@ h2 {
   .move-meta { grid-template-columns: repeat(2,1fr); }
   .chart-wrap { height: 200px; }
 }
+
+
+/* ==========================================================================
+   2026-08-30 aligned time-column layout
+   Main timelines/plots stay in column 1. Current/context boxes live in column 2.
+   ========================================================================== */
+
+:root {
+  --context-column-width: 170px;
+  --quality-3: #66d17a;
+  --quality-4: #00b83f;
+}
+
+/* Master timeline: timeline at left, trial summary at right. */
+.timeline-card.aligned-timeline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--context-column-width);
+  column-gap: 16px;
+  align-items: stretch;
+}
+
+.timeline-main {
+  min-width: 0;
+}
+
+.timeline-summary {
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fbfcfb;
+  min-height: 150px;
+  padding: 13px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.timeline-summary .summary-kicker {
+  color: var(--muted);
+  font-size: .70rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 800;
+}
+
+.timeline-summary .summary-percent {
+  margin-top: 6px;
+  color: var(--brand-deep);
+  font-size: 2.15rem;
+  line-height: 1;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-summary .summary-label {
+  color: var(--muted);
+  font-size: .75rem;
+  margin-top: 3px;
+}
+
+.timeline-summary .summary-meta {
+  margin-top: 11px;
+  color: #354039;
+  font-size: .76rem;
+  line-height: 1.55;
+}
+
+.timeline-summary .summary-complete {
+  color: var(--quality-4);
+  font-weight: 800;
+}
+
+/* Every chart card uses the same plot/context two-column geometry. */
+.chart-card.has-context-column {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--context-column-width);
+  grid-template-areas:
+    "heading heading"
+    "plot context"
+    "legend context";
+  column-gap: 16px;
+  align-items: stretch;
+}
+
+.chart-card.has-context-column .chart-title-row {
+  grid-area: heading;
+}
+
+.chart-card.has-context-column .chart-wrap {
+  grid-area: plot;
+  min-width: 0;
+}
+
+.chart-card.has-context-column .legend {
+  grid-area: legend;
+}
+
+.chart-context {
+  grid-area: context;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fbfcfb;
+  overflow: hidden;
+  align-self: stretch;
+  min-height: 140px;
+}
+
+.chart-context canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 140px;
+}
+
+/* Keep all time-series canvases starting from the same horizontal chart column. */
+.chart-card .chart-wrap {
+  width: 100%;
+}
+
+/* Quality colors are status colors, deliberately brighter than CALHCI branding. */
+.quality-chip.q3 { background: var(--quality-3) !important; }
+.quality-chip.q4 { background: var(--quality-4) !important; }
+
+@media (max-width: 850px) {
+  .timeline-card.aligned-timeline,
+  .chart-card.has-context-column {
+    display: block;
+  }
+
+  .timeline-summary,
+  .chart-context {
+    margin-top: 12px;
+    min-height: 125px;
+  }
+}
