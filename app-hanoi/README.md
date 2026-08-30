@@ -20,7 +20,7 @@ AppHanoi/
 │   ├── face.txt
 │   ├── motion.txt
 │   ├── trials.txt
-│   └── survey.json       # optional
+│   └── surveys.json      # optional
 └── 873/
     └── ... same standardized files ...
 ```
@@ -29,7 +29,7 @@ AppHanoi/
 
 1. Create a folder using the participant ID, for example `873/`.
 2. Put the seven standardized study data files in that folder.
-3. If survey data is available, add it as `survey.json` in the same folder.
+3. If survey data is available, add it as `surveys.json` in the same folder.
 4. Add the participant ID to `participants.json`.
 
 Example:
@@ -44,7 +44,7 @@ No application code needs to change when another participant is added.
 
 ## Survey data
 
-`survey.json` is optional. When present, the dashboard displays a
+`surveys.json` is optional. When present, the dashboard displays a
 **Participant Surveys** section at the end of the dashboard. When it is absent,
 the section remains hidden.
 

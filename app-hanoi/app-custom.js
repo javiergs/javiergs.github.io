@@ -493,7 +493,7 @@ requestAnimationFrame(()=>{
 
 /* ==========================================================================
    Participant Surveys
-   Loads <participant>/survey.json. Missing file = section stays hidden.
+   Loads <participant>/surveys.json (with survey.json fallback). Missing file = section stays hidden.
    ========================================================================== */
 
 state.survey = null;
@@ -693,9 +693,16 @@ async function loadSurveyForParticipant(id) {
   renderSurveySection();
 
   try {
-    const response = await fetch(`${encodeURIComponent(id)}/survey.json`, {cache:"no-store"});
+    const base = encodeURIComponent(id);
+    let response = await fetch(`${base}/surveys.json`, {cache:"no-store"});
+
+    // Backward-compatible fallback for folders that use survey.json.
+    if (response.status === 404) {
+      response = await fetch(`${base}/survey.json`, {cache:"no-store"});
+    }
+
     if (response.status === 404) return;
-    if (!response.ok) throw new Error(`${id}/survey.json: ${response.status} ${response.statusText}`);
+    if (!response.ok) throw new Error(`${id}/surveys.json: ${response.status} ${response.statusText}`);
 
     const survey = await response.json();
     // Participant number is useful for validation, but do not reject older files
