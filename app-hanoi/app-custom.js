@@ -733,3 +733,134 @@ requestAnimationFrame(() => {
   ensureSurveySection();
   if (state.participant) loadSurveyForParticipant(state.participant);
 });
+
+/* Survey wording refinement — 2026-08-30
+ * Load after app-custom.js. Overrides only survey presentation.
+ */
+
+function surveyRatingScale(label, value, leftLabel, rightLabel, max=5) {
+  const n = Number(value);
+  const valid = Number.isFinite(n);
+  const count = valid ? Math.max(0, Math.min(max, Math.round(n))) : 0;
+  let dots = "";
+  for (let i=1; i<=max; i++) {
+    dots += `<span class="survey-rating-dot${i<=count ? " on" : ""}"></span>`;
+  }
+  return `<div class="survey-rating-block">
+    <div class="survey-rating-row">
+      <span class="survey-rating-label">${escapeHTML(label)}</span>
+      <span class="survey-rating-dots" aria-label="${valid ? `${count} of ${max}` : "not available"}">${dots}</span>
+      <span class="survey-rating-number">${valid ? `${count}/${max}` : "—"}</span>
+    </div>
+    <div class="survey-scale-direction">
+      <span>${escapeHTML(leftLabel)}</span>
+      <span>1–${max}</span>
+      <span>${escapeHTML(rightLabel)}</span>
+    </div>
+  </div>`;
+}
+
+renderPreSurvey = function(pre) {
+  const card = el("preSurveyCard");
+  if (!card) return;
+  if (!pre) {
+    card.innerHTML = `<div class="survey-card-header"><h3 class="survey-card-title">Pre-Survey</h3></div>
+      <div class="survey-empty">No pre-survey data.</div>`;
+    return;
+  }
+
+  const mood = pre.emotional_state_ratings || {};
+  const background = [
+    surveyTextKV("Age", pre.age),
+    surveyTextKV("Gender", pre.gender)
+  ].join("");
+
+  const prior = [
+    surveyKV("Interacted with a robot before", surveyYesNo(pre.interacted_with_robot_before)),
+    surveyKV("Used EEG / emotion-monitoring before", surveyYesNo(pre.used_eeg_or_emotion_monitoring_before)),
+    surveyKV("Done Tower of Hanoi before", surveyYesNo(pre.done_tower_of_hanoi_before))
+  ].join("");
+
+  let emotion = [
+    surveyRating("Confidence in solving puzzle today", pre.puzzle_confidence),
+    surveyRating("Stressed", mood.stressed),
+    surveyRating("Calmed", mood.calmed),
+    surveyRating("Frustrated", mood.frustrated)
+  ].join("");
+
+  if (pre.emotional_state_description) {
+    emotion += `<div class="survey-response-label">Current emotional state</div>
+      <div class="survey-quote">${escapeHTML(String(pre.emotional_state_description))}</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="survey-card-header">
+      <h3 class="survey-card-title">Pre-Survey</h3>
+      <span class="survey-card-subtitle">${escapeHTML(String(surveySafe(pre.date, "")))}</span>
+    </div>
+    ${surveyGroup("Participant", `<div class="survey-kv-grid">${background}</div>`)}
+    ${surveyGroup("Prior Experience", `<div class="survey-kv-grid">${prior}</div>`)}
+    ${surveyGroup("Before the Study", emotion)}
+  `;
+};
+
+renderPostSurvey = function(post) {
+  const card = el("postSurveyCard");
+  if (!card) return;
+  if (!post) {
+    card.innerHTML = `<div class="survey-card-header"><h3 class="survey-card-title">Post-Survey</h3></div>
+      <div class="survey-empty">No post-survey data.</div>`;
+    return;
+  }
+
+  const experience = [
+    surveyKV("Overall experience with robot", surveyPill(post.overall_experience_with_robot)),
+    surveyKV("Robot was helpful during task", surveyPill(post.robot_helpfulness)),
+    surveyKV("Robot responded to needs at right time", surveyPill(post.robot_response_timing)),
+    surveyKV("Robot seemed aware of frustration / stress", surveyPill(post.robot_awareness_of_frustration_or_stress))
+  ].join("");
+
+  const source = post.frustration_source || {};
+  let frustration = surveyKV("Experienced frustration during task", surveyYesNo(post.experienced_frustration));
+  if (post.experienced_frustration === true) {
+    frustration += `<div class="survey-kv-grid" style="margin-top:8px">
+      ${surveyKV("Puzzle", surveyPill(source.puzzle))}
+      ${surveyKV("Robot", surveyPill(source.robot))}
+      ${surveyKV("Touch-screen control", surveyPill(source.touch_screen_control))}
+      ${surveyKV("Other", surveyPill(source.other))}
+    </div>`;
+  }
+
+  const attempts = post.attempts || {};
+  const attemptRows = [
+    surveyTextKV("Attempt 1", attempts.attempt_1),
+    surveyTextKV("Attempt 2", attempts.attempt_2)
+  ].join("");
+
+  const eeg = post.eeg_headset || {};
+  let final = [
+    surveyRatingScale("Comfort while wearing EEG headset", eeg.comfort_level,
+                      "Very uncomfortable", "Very comfortable"),
+    surveyRatingScale("Safety concerns working near robot", post.robot_safety_concerns,
+                      "Very low", "Very high"),
+    surveyRatingScale("Likelihood of participating in future studies", post.participate_in_similar_studies_future,
+                      "Very likely", "Very unlikely")
+  ].join("");
+
+  if (eeg.discomfort_description) {
+    final += `<div class="survey-response-label">EEG headset discomfort</div>
+      <div class="survey-quote">${escapeHTML(String(eeg.discomfort_description))}</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="survey-card-header">
+      <h3 class="survey-card-title">Post-Survey</h3>
+      <span class="survey-card-subtitle">After study</span>
+    </div>
+    ${surveyGroup("Robot Experience", `<div class="survey-kv-grid">${experience}</div>`)}
+    ${surveyGroup("Frustration", frustration)}
+    ${surveyGroup("Attempts", `<div class="survey-kv-grid">${attemptRows}</div>`)}
+    ${surveyGroup("Comfort, Safety & Future Participation", final)}
+  `;
+};
+
