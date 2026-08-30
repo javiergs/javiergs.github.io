@@ -202,7 +202,8 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
 .lab-logo {
   width: 150px;
   height: 66px;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   border-radius: 8px;
   display: block;
   box-shadow: 0 2px 8px rgba(34,69,52,.15);
@@ -235,4 +236,16 @@ footer { width: min(1500px, calc(100% - 28px)); margin: 0 auto 28px; display: fl
 }
 .quality-value-check input {
   accent-color: #ff9364;
+}
+
+
+.lab-logo {
+  background: #eef2ef;
+  padding: 3px;
+  box-sizing: border-box;
+}
+
+
+.face-group-wrap {
+  height: 330px;
 }

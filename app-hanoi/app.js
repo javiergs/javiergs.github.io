@@ -487,24 +487,7 @@ function buildCharts() {
     const legend = el(`legend-${chart.id}`);
 
     if (chart.type === "faceGroup") {
-      const actions = new Set();
-      for (const row of chart.rawRows) {
-        ["Action Eye","Action Upper Face","Action Lower Face"].forEach(key => {
-          const action = normalizeFaceAction(row[key]);
-          if (action) actions.add(action);
-        });
-      }
-      const sortedActions = [...actions].sort();
-      if (!Object.keys(state.visibleFaceActions).length) {
-        sortedActions.forEach(action => state.visibleFaceActions[action] = true);
-      }
-      legend.classList.add("selectable-legend");
-      legend.innerHTML = sortedActions.map(action =>
-        `<label class="series-check face-action-check" style="color:${faceActionColor(action)}">
-          <input type="checkbox" data-face-action="${escapeHTML(action)}" ${state.visibleFaceActions[action] !== false ? "checked" : ""}>
-          <span class="legend-swatch face-swatch"></span>${escapeHTML(action)}
-        </label>`
-      ).join("");
+      legend.innerHTML = "";
     } else if (chart.type === "faceCurrent") {
       legend.innerHTML = "";
     } else if (chart.type === "faceLane") {
@@ -549,22 +532,15 @@ function buildCharts() {
     });
   });
 
-  document.querySelectorAll(".face-action-check input").forEach(input => {
-    input.addEventListener("change", event => {
-      const action = event.currentTarget.dataset.faceAction;
-      state.visibleFaceActions[action] = event.currentTarget.checked;
-      drawAllCharts();
-    });
-  });
-
   document.querySelectorAll(".quality-value-check input").forEach(input => {
     input.addEventListener("change", event => {
       const value = Number(event.currentTarget.dataset.qualityValue);
       state.visibleQualityValues[value] = event.currentTarget.checked;
       drawAllCharts();
     });
-  });
+  });  installFaceCanvasClickHandlers();
 }
+
 
 function visibleChartKeys(chart) {
   if (!chart.keys) return [];
@@ -686,6 +662,29 @@ function refreshChartModeUI() {
       ? `${base} · centered ${state.smoothSeconds}s moving average`
       : `${base}${chart.id === "eeg" ? " (display downsampled)" : ""}`;
   });
+}
+
+function installFaceCanvasClickHandlers(){
+  for(const chart of state.charts){
+    if(chart.type!=="faceGroup") continue;
+    const canvas=el(`chart-${chart.id}`);
+    if(!canvas || canvas._faceClickInstalled) continue;
+    canvas._faceClickInstalled=true;
+    canvas.addEventListener("click",event=>{
+      const rect=canvas.getBoundingClientRect();
+      const sx=canvas.width/rect.width;
+      const sy=canvas.height/rect.height;
+      const px=(event.clientX-rect.left)*sx/window.devicePixelRatio;
+      const py=(event.clientY-rect.top)*sy/window.devicePixelRatio;
+      for(const hit of chart._faceLegendHits||[]){
+        if(px>=hit.x && px<=hit.x+hit.w && py>=hit.y && py<=hit.y+hit.h){
+          state.visibleFaceActions[hit.action]=state.visibleFaceActions[hit.action]===false;
+          drawAllCharts();
+          break;
+        }
+      }
+    });
+  }
 }
 
 function setupCanvas(canvas) {
@@ -855,6 +854,15 @@ function drawFaceLane(chart) {
 
 
 
+function faceLaneActions(rows,actionKey){
+  const set=new Set();
+  for(const row of rows){
+    const action=normalizeFaceAction(row[actionKey]);
+    if(action) set.add(action);
+  }
+  return [...set].sort();
+}
+
 function drawFaceGroup(chart){
   const canvas=el(`chart-${chart.id}`);
   if(!canvas) return;
@@ -862,11 +870,14 @@ function drawFaceGroup(chart){
   ctx.clearRect(0,0,w,h);
 
   const leftW=Math.min(205,Math.max(170,w*.15));
-  const gap=64;
+  const gap=20;
   const faceBox={x:8,y:10,w:leftW-8,h:h-20};
-  const plot={x:leftW+gap,y:16,w:w-leftW-gap-16,h:h-42};
+
+  // right-side plot region
+  const rightX=leftW+gap;
+  const rightW=w-rightX-14;
   const [t0,t1]=state.domain;
-  const x=t=>plot.x+((t-t0)/(t1-t0))*plot.w;
+  const x=t=>rightX+((t-t0)/(t1-t0))*rightW;
 
   // Current-expression square
   ctx.fillStyle="#fbfcfb";
@@ -879,81 +890,174 @@ function drawFaceGroup(chart){
   const eye=normalizeFaceAction(row?row["Action Eye"]:"neutral");
   const upper=normalizeFaceAction(row?row["Action Upper Face"]:"neutral");
   const lower=normalizeFaceAction(row?row["Action Lower Face"]:"neutral");
-  drawExpressionFace(ctx,faceBox.x+faceBox.w/2,faceBox.y+faceBox.h*.44,eye,upper,lower);
+  drawExpressionFace(ctx,faceBox.x+faceBox.w/2,faceBox.y+faceBox.h*.42,eye,upper,lower);
 
   ctx.fillStyle="#18211b";
-  ctx.font="700 10px system-ui";
+  ctx.font="700 9px system-ui";
   ctx.textAlign="center";
   ctx.textBaseline="top";
-  ctx.font="700 9px system-ui";
   ctx.fillText(`${eye} · ${upper} · ${lower}`,faceBox.x+faceBox.w/2,faceBox.y+faceBox.h-24);
 
-  // Three categorical timelines on the right.
-  const lanes=[
-    ["Eyes","Action Eye",null],
-    ["Upper Face","Action Upper Face","Power Upper Face"],
-    ["Lower Face","Action Lower Face","Power Lower Face"]
+  const laneDefs=[
+    {
+      title:"EYES",
+      actionKey:"Action Eye",
+      powerKey:null
+    },
+    {
+      title:"UPPER FACE",
+      actionKey:"Action Upper Face",
+      powerKey:"Power Upper Face"
+    },
+    {
+      title:"LOWER FACE",
+      actionKey:"Action Lower Face",
+      powerKey:"Power Lower Face"
+    }
   ];
-  const laneH=plot.h/3;
 
-  drawBackgroundBands(ctx,plot.x,plot.y,plot.w,plot.h,x);
+  // Each lane gets: title, plot bar, and its own small checkbox legend.
+  const top=10;
+  const bottom=24;
+  const laneBlockH=(h-top-bottom)/3;
+  const titleH=18;
+  const legendH=22;
+  const barH=Math.max(28,laneBlockH-titleH-legendH-8);
 
-  lanes.forEach(([label,actionKey,powerKey],li)=>{
-    const y0=plot.y+li*laneH;
+  drawBackgroundBands(ctx,rightX,top,rightW,h-top-bottom,x);
+
+  laneDefs.forEach((lane,li)=>{
+    const blockY=top+li*laneBlockH;
+    const titleY=blockY+2;
+    const barY=blockY+titleH;
+    const legendY=barY+barH+4;
+
+    // lane title ABOVE bar
+    ctx.fillStyle="#606a64";
+    ctx.font="800 11px system-ui";
+    ctx.textAlign="left";
+    ctx.textBaseline="top";
+    ctx.fillText(lane.title,rightX,titleY);
+
+    // draw categorical bar
     const rows=chart.rows.filter(r=>r._t>=t0-1 && r._t<=t1+1);
-
-    ctx.fillStyle="#7e8781";
-    ctx.font="11px system-ui";
-    ctx.textAlign="right";
-    ctx.textBaseline="middle";
-    ctx.fillText(label,plot.x-12,y0+laneH/2);
-
     for(let i=0;i<rows.length;i++){
       const r=rows[i];
       const nextT=i+1<rows.length?rows[i+1]._t:r._t+.1;
-      const x1=Math.max(plot.x,x(r._t));
-      const x2=Math.min(plot.x+plot.w,x(nextT));
+      const x1=Math.max(rightX,x(r._t));
+      const x2=Math.min(rightX+rightW,x(nextT));
       if(x2<=x1) continue;
-      const action=normalizeFaceAction(r[actionKey]);
-      if(state.visibleFaceActions[action] === false) continue;
-      let power=powerKey?asNumber(r[powerKey]):1;
+
+      const action=normalizeFaceAction(r[lane.actionKey]);
+      if(state.visibleFaceActions[action]===false) continue;
+
+      let power=lane.powerKey?asNumber(r[lane.powerKey]):1;
       if(power===null) power=0;
       power=Math.max(0,Math.min(1,power));
-      const alpha=action==="neutral"?.16:(powerKey?.35+.65*power:.88);
+      const alpha=action==="neutral"?.16:(lane.powerKey?.35+.65*power:.88);
+
       ctx.globalAlpha=alpha;
       ctx.fillStyle=faceActionColor(action);
-      ctx.fillRect(x1,y0+4,Math.max(1,x2-x1+.5),Math.max(4,laneH-8));
+      ctx.fillRect(x1,barY,Math.max(1,x2-x1+.5),barH);
     }
     ctx.globalAlpha=1;
 
     ctx.strokeStyle="#d4d9d6";
     ctx.lineWidth=1;
-    ctx.beginPath();
-    ctx.moveTo(plot.x,y0+laneH);
-    ctx.lineTo(plot.x+plot.w,y0+laneH);
-    ctx.stroke();
+    ctx.strokeRect(rightX,barY,rightW,barH);
+
+    // lane-specific color / checkbox legend BELOW bar
+    const actions=faceLaneActions(chart.rawRows,lane.actionKey);
+    let lx=rightX;
+    ctx.font="10px system-ui";
+    ctx.textAlign="left";
+    ctx.textBaseline="middle";
+
+    for(const action of actions){
+      const checked=state.visibleFaceActions[action]!==false;
+      const box=10;
+      const labelW=ctx.measureText(action).width;
+      const itemW=box+6+10+4+labelW+16;
+
+      // wrap if needed
+      if(lx+itemW>rightX+rightW){
+        // keep compact: stop rendering excess items rather than overlap
+        break;
+      }
+
+      // checkbox
+      ctx.fillStyle="#ffffff";
+      ctx.strokeStyle="#66706a";
+      ctx.lineWidth=1.1;
+      ctx.strokeRect(lx,legendY,box,box);
+      if(checked){
+        ctx.fillStyle="#18211b";
+        ctx.fillRect(lx+2,legendY+2,box-4,box-4);
+      }
+
+      // color swatch
+      ctx.fillStyle=faceActionColor(action);
+      ctx.fillRect(lx+box+6,legendY+1,10,8);
+
+      // label
+      ctx.fillStyle="#4d5651";
+      ctx.fillText(action,lx+box+20,legendY+box/2);
+
+      lx+=itemW;
+    }
+
+    // separator between lane blocks
+    if(li<laneDefs.length-1){
+      ctx.strokeStyle="#e3e6e4";
+      ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(rightX,blockY+laneBlockH-2);
+      ctx.lineTo(rightX+rightW,blockY+laneBlockH-2);
+      ctx.stroke();
+    }
   });
 
+  // x-axis at the bottom only
   ctx.fillStyle="#a8a8a8";
   ctx.font="11px system-ui";
   ctx.textAlign="center";
   ctx.textBaseline="top";
   for(let i=0;i<=4;i++){
-    const xx=plot.x+plot.w*i/4;
+    const xx=rightX+rightW*i/4;
     const tt=t0+(t1-t0)*i/4;
-    ctx.fillText(formatClockShort(tt),xx,plot.y+plot.h+6);
+    ctx.fillText(formatClockShort(tt),xx,h-19);
   }
 
   const cursorX=x(state.currentTime);
-  if(cursorX>=plot.x && cursorX<=plot.x+plot.w){
+  if(cursorX>=rightX && cursorX<=rightX+rightW){
     ctx.strokeStyle="#ff9364";
     ctx.lineWidth=1.5;
     ctx.beginPath();
-    ctx.moveTo(cursorX,plot.y);
-    ctx.lineTo(cursorX,plot.y+plot.h);
+    ctx.moveTo(cursorX,top);
+    ctx.lineTo(cursorX,h-bottom);
     ctx.stroke();
   }
+
+  // Hit boxes for per-lane checkboxes, used by canvas click handler.
+  chart._faceLegendHits=[];
+  laneDefs.forEach((lane,li)=>{
+    const blockY=top+li*laneBlockH;
+    const barY=blockY+titleH;
+    const legendY=barY+barH+4;
+    const actions=faceLaneActions(chart.rawRows,lane.actionKey);
+    let lx=rightX;
+    ctx.font="10px system-ui";
+    for(const action of actions){
+      const box=10;
+      const labelW=ctx.measureText(action).width;
+      const itemW=box+6+10+4+labelW+16;
+      if(lx+itemW>rightX+rightW) break;
+      chart._faceLegendHits.push({x:lx,y:legendY,w:itemW,h:14,action});
+      lx+=itemW;
+    }
+  });
 }
+
 
 function drawFaceCurrent(chart){
   const canvas=el(`chart-${chart.id}`);
