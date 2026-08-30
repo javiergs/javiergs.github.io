@@ -759,3 +759,235 @@ h2 {
     min-height: 125px;
   }
 }
+
+
+/* ==========================================================================
+   Participant Surveys
+   Optional participant-folder file: <participant>/survey.json
+   ========================================================================== */
+
+.survey-section {
+  margin-top: 18px;
+}
+
+.survey-section[hidden] {
+  display: none !important;
+}
+
+.survey-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 2px 10px;
+}
+
+.survey-section-heading .eyebrow {
+  margin-bottom: 3px;
+}
+
+.survey-section-heading h2 {
+  margin: 0;
+}
+
+.survey-section-note {
+  color: var(--muted);
+  font-size: .78rem;
+  text-align: right;
+}
+
+.survey-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.survey-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  min-width: 0;
+}
+
+.survey-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 11px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.survey-card-title {
+  margin: 0;
+  color: var(--brand-deep);
+  font-size: 1.03rem;
+  font-weight: 850;
+  letter-spacing: .01em;
+}
+
+.survey-card-subtitle {
+  color: var(--muted);
+  font-size: .72rem;
+}
+
+.survey-group + .survey-group {
+  margin-top: 15px;
+  padding-top: 14px;
+  border-top: 1px solid #e5e9e6;
+}
+
+.survey-group-title {
+  margin: 0 0 8px;
+  color: #6d7771;
+  font-size: .69rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.survey-kv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.survey-kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #e2e7e4;
+  border-radius: 9px;
+  background: #fbfcfb;
+}
+
+.survey-kv-label {
+  color: #59635d;
+  font-size: .75rem;
+  line-height: 1.25;
+}
+
+.survey-value {
+  color: #1f2923;
+  font-size: .77rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.survey-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef4f0;
+  color: var(--brand-deep);
+  font-size: .73rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.survey-pill.no {
+  background: #f0f2f1;
+  color: #68716c;
+}
+
+.survey-rating-row {
+  display: grid;
+  grid-template-columns: minmax(118px, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 31px;
+}
+
+.survey-rating-label {
+  color: #505b54;
+  font-size: .76rem;
+}
+
+.survey-rating-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.survey-rating-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d9dfdb;
+  border: 1px solid #c9d0cc;
+}
+
+.survey-rating-dot.on {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.survey-rating-number {
+  min-width: 25px;
+  color: #38433c;
+  font-size: .73rem;
+  font-weight: 800;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.survey-quote {
+  margin-top: 9px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--gold);
+  border-radius: 0 8px 8px 0;
+  background: #fbfaf5;
+  color: #4e5752;
+  font-size: .78rem;
+  line-height: 1.45;
+}
+
+.survey-quote::before {
+  content: "“";
+  color: var(--gold);
+  font-size: 1.1rem;
+  font-weight: 850;
+  margin-right: 2px;
+}
+
+.survey-quote::after {
+  content: "”";
+  color: var(--gold);
+  font-size: 1.1rem;
+  font-weight: 850;
+  margin-left: 2px;
+}
+
+.survey-empty {
+  color: var(--muted);
+  font-size: .78rem;
+  padding: 8px 0;
+}
+
+@media (max-width: 900px) {
+  .survey-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .survey-kv-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .survey-section-heading {
+    display: block;
+  }
+
+  .survey-section-note {
+    margin-top: 5px;
+    text-align: left;
+  }
+}

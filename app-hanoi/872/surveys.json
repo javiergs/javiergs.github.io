@@ -1,0 +1,67 @@
+{
+  "participant_number": 872,
+  "pre_survey": {
+    "id": 1,
+    "start_time": {
+      "datetime": "2026-07-13_10-08-46.000",
+      "timestamp": 1783962526.0
+    },
+    "completion_time": {
+      "datetime": "2026-07-13_10-28-57.000",
+      "timestamp": 1783963737.0
+    },
+    "email": "anonymous",
+    "name": null,
+    "last_modified_time": null,
+    "date": "2026-07-13",
+    "age": 20,
+    "gender": "Woman",
+    "interacted_with_robot_before": false,
+    "robot_interaction_description": null,
+    "used_eeg_or_emotion_monitoring_before": false,
+    "eeg_or_emotion_monitoring_description": null,
+    "done_tower_of_hanoi_before": false,
+    "puzzle_confidence": 3,
+    "emotional_state_ratings": {
+      "stressed": 1,
+      "calmed": 4,
+      "frustrated": 1
+    },
+    "emotional_state_description": "Chill and relaxed"
+  },
+  "post_survey": {
+    "id": 1,
+    "start_time": {
+      "datetime": "2026-07-13_10-07-00.000",
+      "timestamp": 1783962420.0
+    },
+    "completion_time": {
+      "datetime": "2026-07-13_11-23-15.000",
+      "timestamp": 1783966995.0
+    },
+    "email": "anonymous",
+    "name": null,
+    "last_modified_time": null,
+    "overall_experience_with_robot": "Good",
+    "robot_helpfulness": "Average",
+    "robot_response_timing": "Excellent",
+    "robot_awareness_of_frustration_or_stress": "Very Poor",
+    "experienced_frustration": true,
+    "frustration_source": {
+      "puzzle": "Medium",
+      "robot": "Very low",
+      "touch_screen_control": "No",
+      "other": "No"
+    },
+    "attempts": {
+      "attempt_1": 3,
+      "attempt_2": 0
+    },
+    "eeg_headset": {
+      "comfort_level": 3,
+      "discomfort_description": null
+    },
+    "robot_safety_concerns": 1,
+    "participate_in_similar_studies_future": 4
+  }
+}

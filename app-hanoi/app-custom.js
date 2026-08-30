@@ -489,3 +489,240 @@ requestAnimationFrame(()=>{
     console.warn("AppHanoi refinement deferred until participant data loads.", e);
   }
 });
+
+
+/* ==========================================================================
+   Participant Surveys
+   Loads <participant>/survey.json. Missing file = section stays hidden.
+   ========================================================================== */
+
+state.survey = null;
+
+function ensureSurveySection() {
+  let section = el("participantSurveys");
+  if (section) return section;
+
+  section = document.createElement("section");
+  section.id = "participantSurveys";
+  section.className = "survey-section";
+  section.hidden = true;
+  section.innerHTML = `
+    <div class="survey-section-heading">
+      <div>
+        <div class="eyebrow">Participant-reported data</div>
+        <h2>Participant Surveys</h2>
+      </div>
+      <div class="survey-section-note" id="surveyParticipantLabel"></div>
+    </div>
+    <div class="survey-grid">
+      <article class="survey-card" id="preSurveyCard"></article>
+      <article class="survey-card" id="postSurveyCard"></article>
+    </div>`;
+
+  const charts = el("charts");
+  if (charts && charts.parentNode) charts.insertAdjacentElement("afterend", section);
+  else document.querySelector("main")?.appendChild(section);
+
+  return section;
+}
+
+function surveySafe(value, fallback="—") {
+  return value === null || value === undefined || value === "" ? fallback : value;
+}
+
+function surveyYesNo(value) {
+  if (value === true) return '<span class="survey-pill">Yes</span>';
+  if (value === false) return '<span class="survey-pill no">No</span>';
+  return '<span class="survey-value">—</span>';
+}
+
+function surveyPill(value) {
+  if (value === null || value === undefined || value === "") {
+    return '<span class="survey-value">—</span>';
+  }
+  const v = escapeHTML(String(value));
+  const noClass = String(value).trim().toLowerCase() === "no" ? " no" : "";
+  return `<span class="survey-pill${noClass}">${v}</span>`;
+}
+
+function surveyKV(label, valueHTML) {
+  return `<div class="survey-kv"><span class="survey-kv-label">${escapeHTML(label)}</span>${valueHTML}</div>`;
+}
+
+function surveyTextKV(label, value) {
+  return surveyKV(label, `<span class="survey-value">${escapeHTML(String(surveySafe(value)))}</span>`);
+}
+
+function surveyRating(label, value, max=5) {
+  const n = Number(value);
+  const valid = Number.isFinite(n);
+  const count = valid ? Math.max(0, Math.min(max, Math.round(n))) : 0;
+  let dots = "";
+  for (let i=1; i<=max; i++) {
+    dots += `<span class="survey-rating-dot${i<=count ? " on" : ""}"></span>`;
+  }
+  return `<div class="survey-rating-row">
+    <span class="survey-rating-label">${escapeHTML(label)}</span>
+    <span class="survey-rating-dots" aria-label="${valid ? `${count} of ${max}` : "not available"}">${dots}</span>
+    <span class="survey-rating-number">${valid ? `${count}/${max}` : "—"}</span>
+  </div>`;
+}
+
+function surveyGroup(title, body) {
+  return `<section class="survey-group">
+    <h4 class="survey-group-title">${escapeHTML(title)}</h4>
+    ${body}
+  </section>`;
+}
+
+function renderPreSurvey(pre) {
+  const card = el("preSurveyCard");
+  if (!card) return;
+  if (!pre) {
+    card.innerHTML = `<div class="survey-card-header"><h3 class="survey-card-title">Pre-Survey</h3></div>
+      <div class="survey-empty">No pre-survey data.</div>`;
+    return;
+  }
+
+  const mood = pre.emotional_state_ratings || {};
+  const background = [
+    surveyTextKV("Age", pre.age),
+    surveyTextKV("Gender", pre.gender)
+  ].join("");
+
+  const prior = [
+    surveyKV("Robot interaction before", surveyYesNo(pre.interacted_with_robot_before)),
+    surveyKV("EEG / emotion monitoring before", surveyYesNo(pre.used_eeg_or_emotion_monitoring_before)),
+    surveyKV("Tower of Hanoi before", surveyYesNo(pre.done_tower_of_hanoi_before))
+  ].join("");
+
+  let emotion = [
+    surveyRating("Puzzle confidence", pre.puzzle_confidence),
+    surveyRating("Stressed", mood.stressed),
+    surveyRating("Calmed", mood.calmed),
+    surveyRating("Frustrated", mood.frustrated)
+  ].join("");
+  if (pre.emotional_state_description) {
+    emotion += `<div class="survey-quote">${escapeHTML(String(pre.emotional_state_description))}</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="survey-card-header">
+      <h3 class="survey-card-title">Pre-Survey</h3>
+      <span class="survey-card-subtitle">${escapeHTML(String(surveySafe(pre.date, "")))}</span>
+    </div>
+    ${surveyGroup("Participant", `<div class="survey-kv-grid">${background}</div>`)}
+    ${surveyGroup("Prior Experience", `<div class="survey-kv-grid">${prior}</div>`)}
+    ${surveyGroup("Before the Study", emotion)}
+  `;
+}
+
+function renderPostSurvey(post) {
+  const card = el("postSurveyCard");
+  if (!card) return;
+  if (!post) {
+    card.innerHTML = `<div class="survey-card-header"><h3 class="survey-card-title">Post-Survey</h3></div>
+      <div class="survey-empty">No post-survey data.</div>`;
+    return;
+  }
+
+  const experience = [
+    surveyKV("Overall experience", surveyPill(post.overall_experience_with_robot)),
+    surveyKV("Robot helpfulness", surveyPill(post.robot_helpfulness)),
+    surveyKV("Response timing", surveyPill(post.robot_response_timing)),
+    surveyKV("Awareness of frustration / stress", surveyPill(post.robot_awareness_of_frustration_or_stress))
+  ].join("");
+
+  const source = post.frustration_source || {};
+  let frustration = surveyKV("Experienced frustration", surveyYesNo(post.experienced_frustration));
+  if (post.experienced_frustration === true) {
+    frustration += `<div class="survey-kv-grid" style="margin-top:8px">
+      ${surveyKV("Puzzle", surveyPill(source.puzzle))}
+      ${surveyKV("Robot", surveyPill(source.robot))}
+      ${surveyKV("Touch-screen control", surveyPill(source.touch_screen_control))}
+      ${surveyKV("Other", surveyPill(source.other))}
+    </div>`;
+  }
+
+  const attempts = post.attempts || {};
+  const attemptRows = [
+    surveyTextKV("Attempt 1", attempts.attempt_1),
+    surveyTextKV("Attempt 2", attempts.attempt_2)
+  ].join("");
+
+  const eeg = post.eeg_headset || {};
+  let final = [
+    surveyRating("EEG headset comfort", eeg.comfort_level),
+    surveyRating("Robot safety concerns", post.robot_safety_concerns),
+    surveyRating("Participate in similar study again", post.participate_in_similar_studies_future)
+  ].join("");
+  if (eeg.discomfort_description) {
+    final += `<div class="survey-quote">${escapeHTML(String(eeg.discomfort_description))}</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="survey-card-header">
+      <h3 class="survey-card-title">Post-Survey</h3>
+      <span class="survey-card-subtitle">After study</span>
+    </div>
+    ${surveyGroup("Robot Experience", `<div class="survey-kv-grid">${experience}</div>`)}
+    ${surveyGroup("Frustration", frustration)}
+    ${surveyGroup("Attempts", `<div class="survey-kv-grid">${attemptRows}</div>`)}
+    ${surveyGroup("Comfort, Safety & Future Participation", final)}
+  `;
+}
+
+function renderSurveySection() {
+  const section = ensureSurveySection();
+  if (!state.survey) {
+    section.hidden = true;
+    return;
+  }
+
+  const id = state.survey.participant_number ?? state.participant;
+  const label = el("surveyParticipantLabel");
+  if (label) label.textContent = `Participant ${id} · survey.json`;
+
+  renderPreSurvey(state.survey.pre_survey);
+  renderPostSurvey(state.survey.post_survey);
+  section.hidden = false;
+}
+
+async function loadSurveyForParticipant(id) {
+  state.survey = null;
+  renderSurveySection();
+
+  try {
+    const response = await fetch(`${encodeURIComponent(id)}/survey.json`, {cache:"no-store"});
+    if (response.status === 404) return;
+    if (!response.ok) throw new Error(`${id}/survey.json: ${response.status} ${response.statusText}`);
+
+    const survey = await response.json();
+    // Participant number is useful for validation, but do not reject older files
+    // that omit it.
+    if (survey.participant_number !== undefined &&
+        String(survey.participant_number) !== String(id)) {
+      console.warn(`survey.json participant_number (${survey.participant_number}) does not match folder (${id}).`);
+    }
+
+    state.survey = survey;
+    renderSurveySection();
+  } catch (err) {
+    console.warn(`Survey data for participant ${id} was not loaded:`, err);
+    state.survey = null;
+    renderSurveySection();
+  }
+}
+
+/* Wrap participant loading so survey.json follows the same participant folder. */
+const appOriginalLoadParticipant = loadParticipant;
+loadParticipant = async function(id) {
+  await appOriginalLoadParticipant(id);
+  await loadSurveyForParticipant(id);
+};
+
+
+requestAnimationFrame(() => {
+  ensureSurveySection();
+  if (state.participant) loadSurveyForParticipant(state.participant);
+});
