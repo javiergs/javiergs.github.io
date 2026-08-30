@@ -5,17 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Hanoi Study Dashboard</title>
   <meta name="description" content="Synchronized visualization of Tower of Hanoi behavior, EEG, affect, PAD, facial expression, motion, and device data." />
-  <link rel="stylesheet" href="style.css?v=20260829-green" />
+  <link rel="stylesheet" href="style.css?v=20260829-calhci" />
 </head>
 <body>
   <header class="site-header">
     <div class="brand">
-      <img class="lab-logo" src="calhci-logo.jpeg" alt="CALHCI lab" />
+      <img class="lab-logo" src="calhci-logo.png" alt="CALHCI lab" />
       <div>
         <h1>Hanoi Study Dashboard</h1>
         <p class="subtitle">Synchronized behavioral and physiological data</p>
       </div>
     </div>
+
     <div class="participant-picker">
       <label for="participantSelect">Participant</label>
       <select id="participantSelect" aria-label="Participant"></select>
@@ -31,12 +32,14 @@
           <div id="clock" class="clock">--:--:--.---</div>
           <div id="elapsed" class="elapsed">Elapsed --</div>
         </div>
+
         <div class="controls">
           <button id="prevTrial" type="button">◀ Trial</button>
           <button id="prevMove" type="button">◀ Move</button>
           <button id="playPause" type="button">▶ Play</button>
           <button id="nextMove" type="button">Move ▶</button>
           <button id="nextTrial" type="button">Trial ▶</button>
+
           <label class="speed-label">Speed
             <select id="speedSelect">
               <option value="1">1×</option>
@@ -45,18 +48,21 @@
               <option value="60">60×</option>
             </select>
           </label>
+
           <label class="view-label">View
             <select id="viewSelect">
               <option value="experiment" selected>Experiment ± 60 s</option>
               <option value="full">Full recording</option>
             </select>
           </label>
+
           <label class="chart-mode-label">Charts
             <select id="chartMode">
               <option value="raw" selected>Raw</option>
               <option value="smooth">Smoothed</option>
             </select>
           </label>
+
           <label class="smooth-label">Window
             <select id="smoothWindow" disabled>
               <option value="1">1 s</option>
@@ -84,8 +90,10 @@
           </div>
           <div id="trialBadge" class="badge neutral">Outside trial</div>
         </div>
+
         <div id="moveSummary" class="move-summary">Select a participant to begin.</div>
         <div id="hanoiBoard" class="hanoi-board" aria-label="Tower of Hanoi state"></div>
+
         <div class="move-meta">
           <div><span class="meta-label">Move</span><strong id="moveNumber">—</strong></div>
           <div><span class="meta-label">Duration</span><strong id="moveDuration">—</strong></div>
@@ -110,8 +118,14 @@
 
   <footer class="site-footer">
     © 2026 javiergs.info · CALHCI · Hanoi Study Dashboard
+    <!-- Compatibility target for older app.js versions; intentionally hidden. -->
+    <span id="footerParticipant" hidden></span>
   </footer>
 
-  <script src="app.js?v=20260829-green"></script>
+  <!--
+    app-loader.js keeps the existing app.js logic but applies the new
+    CALHCI/chart palette and removes the obsolete footer participant update.
+  -->
+  <script src="app-loader.js?v=20260829-calhci"></script>
 </body>
 </html>
