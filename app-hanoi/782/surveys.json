@@ -1,0 +1,67 @@
+{
+  "participant_number": 782,
+  "pre_survey": {
+    "id": 5,
+    "start_time": {
+      "datetime": "2026-07-13_15-41-36.000",
+      "timestamp": 1783982496.0
+    },
+    "completion_time": {
+      "datetime": "2026-07-13_16-06-15.000",
+      "timestamp": 1783983975.0
+    },
+    "email": "anonymous",
+    "name": null,
+    "last_modified_time": null,
+    "date": "2026-07-13",
+    "age": 20,
+    "gender": "Woman",
+    "interacted_with_robot_before": false,
+    "robot_interaction_description": null,
+    "used_eeg_or_emotion_monitoring_before": false,
+    "eeg_or_emotion_monitoring_description": null,
+    "done_tower_of_hanoi_before": true,
+    "puzzle_confidence": 3,
+    "emotional_state_ratings": {
+      "stressed": 3,
+      "calmed": 2,
+      "frustrated": 2
+    },
+    "emotional_state_description": "normal amount of stress but overall calm "
+  },
+  "post_survey": {
+    "id": 5,
+    "start_time": {
+      "datetime": "2026-07-13_16-35-48.000",
+      "timestamp": 1783985748.0
+    },
+    "completion_time": {
+      "datetime": "2026-07-13_17-29-17.000",
+      "timestamp": 1783988957.0
+    },
+    "email": "anonymous",
+    "name": null,
+    "last_modified_time": null,
+    "overall_experience_with_robot": "Good",
+    "robot_helpfulness": "Good",
+    "robot_response_timing": "Average",
+    "robot_awareness_of_frustration_or_stress": "Poor",
+    "experienced_frustration": true,
+    "frustration_source": {
+      "puzzle": "Very low",
+      "robot": "Low",
+      "touch_screen_control": "No",
+      "other": "No"
+    },
+    "attempts": {
+      "attempt_1": 5,
+      "attempt_2": 5
+    },
+    "eeg_headset": {
+      "comfort_level": 2,
+      "discomfort_description": "slight headache began during second trial, went away after removing"
+    },
+    "robot_safety_concerns": 1,
+    "participate_in_similar_studies_future": 1
+  }
+}
