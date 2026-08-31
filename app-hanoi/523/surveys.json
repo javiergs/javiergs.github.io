@@ -1,0 +1,67 @@
+{
+  "participant_number": 523,
+  "pre_survey": {
+    "id": 3,
+    "start_time": {
+      "datetime": "2026-07-13_12-20-08.000",
+      "timestamp": 1783970408.0
+    },
+    "completion_time": {
+      "datetime": "2026-07-13_14-14-30.000",
+      "timestamp": 1783977270.0
+    },
+    "email": "anonymous",
+    "name": null,
+    "last_modified_time": null,
+    "date": "2026-07-13",
+    "age": 21,
+    "gender": "Woman",
+    "interacted_with_robot_before": true,
+    "robot_interaction_description": "I have briefly used robots in school but not much I can remember from.",
+    "used_eeg_or_emotion_monitoring_before": false,
+    "eeg_or_emotion_monitoring_description": null,
+    "done_tower_of_hanoi_before": "Not sure",
+    "puzzle_confidence": 3,
+    "emotional_state_ratings": {
+      "stressed": 1,
+      "calmed": 4,
+      "frustrated": 1
+    },
+    "emotional_state_description": "I am calm right now and feel happy."
+  },
+  "post_survey": {
+    "id": 3,
+    "start_time": {
+      "datetime": "2026-07-13_15-33-41.000",
+      "timestamp": 1783982021.0
+    },
+    "completion_time": {
+      "datetime": "2026-07-13_15-35-39.000",
+      "timestamp": 1783982139.0
+    },
+    "email": "anonymous",
+    "name": null,
+    "last_modified_time": null,
+    "overall_experience_with_robot": "Good",
+    "robot_helpfulness": "Average",
+    "robot_response_timing": "Good",
+    "robot_awareness_of_frustration_or_stress": "Average",
+    "experienced_frustration": true,
+    "frustration_source": {
+      "puzzle": "Medium",
+      "robot": "Very low",
+      "touch_screen_control": "No",
+      "other": "No"
+    },
+    "attempts": {
+      "attempt_1": 1,
+      "attempt_2": 0
+    },
+    "eeg_headset": {
+      "comfort_level": 3,
+      "discomfort_description": "Slight pressure on the forehead and I was worried it might fall or move if I looked down."
+    },
+    "robot_safety_concerns": 1,
+    "participate_in_similar_studies_future": 1
+  }
+}
