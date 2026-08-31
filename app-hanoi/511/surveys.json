@@ -1,0 +1,67 @@
+{
+  "participant_number": 511,
+  "pre_survey": {
+    "id": 6,
+    "start_time": {
+      "datetime": "2026-07-15_14-38-39.000",
+      "timestamp": 1784151519.0
+    },
+    "completion_time": {
+      "datetime": "2026-07-15_14-41-20.000",
+      "timestamp": 1784151680.0
+    },
+    "email": "anonymous",
+    "name": null,
+    "last_modified_time": null,
+    "date": "2026-07-15",
+    "age": 20,
+    "gender": "Woman",
+    "interacted_with_robot_before": true,
+    "robot_interaction_description": "Very briefly, with robots my friends have made for high school robotics competitions.",
+    "used_eeg_or_emotion_monitoring_before": false,
+    "eeg_or_emotion_monitoring_description": null,
+    "done_tower_of_hanoi_before": false,
+    "puzzle_confidence": 3,
+    "emotional_state_ratings": {
+      "stressed": 2,
+      "calmed": 4,
+      "frustrated": 1
+    },
+    "emotional_state_description": "I have a lot to do this week, so I'm a little stressed, but I know I have enough time to get it done. I also didn't get quite enough sleep last night, so I'm a little out of it. "
+  },
+  "post_survey": {
+    "id": 6,
+    "start_time": {
+      "datetime": "2026-07-15_14-42-02.000",
+      "timestamp": 1784151722.0
+    },
+    "completion_time": {
+      "datetime": "2026-07-15_15-48-26.000",
+      "timestamp": 1784155706.0
+    },
+    "email": "anonymous",
+    "name": null,
+    "last_modified_time": null,
+    "overall_experience_with_robot": "Good",
+    "robot_helpfulness": "Good",
+    "robot_response_timing": "Good",
+    "robot_awareness_of_frustration_or_stress": "Poor",
+    "experienced_frustration": true,
+    "frustration_source": {
+      "puzzle": "Low",
+      "robot": "Very low",
+      "touch_screen_control": "Very low",
+      "other": "No"
+    },
+    "attempts": {
+      "attempt_1": 3,
+      "attempt_2": 4
+    },
+    "eeg_headset": {
+      "comfort_level": 2,
+      "discomfort_description": "The front piece felt like it was digging into my forehead a bit towards the end "
+    },
+    "robot_safety_concerns": 1,
+    "participate_in_similar_studies_future": 5
+  }
+}
