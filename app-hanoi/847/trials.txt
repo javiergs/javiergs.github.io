@@ -1,4 +1,4 @@
-﻿DateTime,Timestamp,Trials,MoveNumber,From,To,MoveDurationSeconds,HelpUsed,ErrorsThisMove,ErrorDetails
+DateTime,Timestamp,Trial,MoveNumber,From,To,MoveDurationSeconds,HelpUsed,ErrorsThisMove,ErrorDetails
 2026-07-13_15-47-14.764,1783982834.764,1,1,A,C,9,FALSE,0,
 2026-07-13_15-47-29.304,1783982849.304,1,2,A,B,14,FALSE,0,
 2026-07-13_15-47-43.284,1783982863.284,1,3,C,B,13,FALSE,0,
