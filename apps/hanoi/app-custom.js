@@ -180,19 +180,19 @@ drawExpressionFace = function(ctx,cx,cy,eyeAction,upperAction,lowerAction) {
 
 function ensureMasterTimelineColumns() {
   const card = document.querySelector(".timeline-card");
-  if (!card || card.classList.contains("aligned-timeline")) return;
+  if (!card) return;
 
-  const main = document.createElement("div");
-  main.className = "timeline-main";
-  while (card.firstChild) main.appendChild(card.firstChild);
+  let summary = document.getElementById("trialCompletionSummary");
+  if (!summary) {
+    summary = document.createElement("aside");
+    summary.className = "timeline-summary";
+    summary.id = "trialCompletionSummary";
+  }
 
-  const summary = document.createElement("aside");
-  summary.className = "timeline-summary";
-  summary.id = "trialCompletionSummary";
-
-  card.appendChild(main);
-  card.appendChild(summary);
-  card.classList.add("aligned-timeline");
+  const mount = document.getElementById("trialInfoMount");
+  if (mount && summary.parentElement !== mount) {
+    mount.replaceChildren(summary);
+  }
 }
 
 function chartForId(id) {
@@ -414,150 +414,27 @@ function currentOrNearestTrialGroup(t) {
   return state.trialGroups[state.trialGroups.length-1];
 }
 
-/* ---------- Exact six-disk Hanoi distance-to-goal ---------- */
-
-const HANOI_PROGRESS_DISKS = 6;
-const HANOI_OPTIMAL_START_DISTANCE = (1 << HANOI_PROGRESS_DISKS) - 1; // 63
-
-let hanoiGoalDistances = null;
-
-function hanoiStateKeyFromPoles(poles) {
-  // Encode each disk by its pole (A=0, B=1, C=2).
-  // Disk labels in the dashboard are 1..6.
-  const pos = new Array(HANOI_PROGRESS_DISKS + 1).fill(0);
-  ["A","B","C"].forEach((poleName,poleIndex)=>{
-    const stack = poles?.[poleName] || [];
-    for (const disk of stack) {
-      const d = Number(disk);
-      if (d >= 1 && d <= HANOI_PROGRESS_DISKS) pos[d] = poleIndex;
-    }
-  });
-  return pos.slice(1).join("");
-}
-
-function hanoiPolesFromKey(key) {
-  const poles=[[],[],[]];
-  for(let d=HANOI_PROGRESS_DISKS; d>=1; d--){
-    const pole=Number(key[d-1]);
-    poles[pole].push(d);
-  }
-  return poles;
-}
-
-function hanoiNeighborKeys(key) {
-  const poles=hanoiPolesFromKey(key);
-  const result=[];
-
-  for(let from=0; from<3; from++){
-    if(!poles[from].length) continue;
-    const disk=poles[from][poles[from].length-1];
-
-    for(let to=0; to<3; to++){
-      if(to===from) continue;
-      const targetTop=poles[to].length ? poles[to][poles[to].length-1] : Infinity;
-      if(disk < targetTop){
-        const next=key.split("");
-        next[disk-1]=String(to);
-        result.push(next.join(""));
-      }
-    }
-  }
-  return result;
-}
-
-function buildHanoiGoalDistances() {
-  if(hanoiGoalDistances) return hanoiGoalDistances;
-
-  const goal="2".repeat(HANOI_PROGRESS_DISKS);
-  const dist=new Map([[goal,0]]);
-  const queue=[goal];
-
-  for(let qi=0; qi<queue.length; qi++){
-    const key=queue[qi];
-    const d=dist.get(key);
-    for(const next of hanoiNeighborKeys(key)){
-      if(!dist.has(next)){
-        dist.set(next,d+1);
-        queue.push(next);
-      }
-    }
-  }
-
-  hanoiGoalDistances=dist;
-  return dist;
-}
-
-function hanoiProgressAtCursor() {
-  const context=currentTrialContext(state.currentTime);
-  const poles=context?.poles || {A:[],B:[],C:[]};
-  const key=hanoiStateKeyFromPoles(poles);
-  const distances=buildHanoiGoalDistances();
-  const remaining=distances.get(key);
-
-  if(!Number.isFinite(remaining)){
-    return {percent:0, remaining:null, solved:false};
-  }
-
-  /*
-   * Completion is state-based, not move-count based:
-   * 0% = the six-disk starting configuration (63 optimal moves away)
-   * 100% = solved
-   * Moving backward can reduce the percentage.
-   */
-  const percent=Math.max(0,Math.min(100,
-    Math.round((1 - remaining/HANOI_OPTIMAL_START_DISTANCE)*100)
-  ));
-
-  return {percent, remaining, solved:remaining===0};
-}
-
 function renderTrialCompletionSummary() {
   const box=el("trialCompletionSummary");
   if(!box) return;
 
   const g=currentOrNearestTrialGroup(state.currentTime);
   if(!g){
-    box.innerHTML='<div class="summary-kicker">Session</div><div class="summary-percent">—</div>';
+    box.innerHTML='<div class="summary-kicker">Session</div><div class="summary-percent">—</div><div class="summary-label">no trial data</div>';
     return;
   }
 
-  const completedMoves=g.moves.filter(m=>m.end<=state.currentTime).length;
-  const totalMoves=Math.max(1,g.moves.length);
-  const trialPercent=Math.max(0,Math.min(100,
-    Math.round(completedMoves/totalMoves*100)
-  ));
+  const completed=g.moves.filter(m=>m.end<=state.currentTime).length;
+  const total=Math.max(1,g.moves.length);
+  const percent=Math.max(0,Math.min(100,Math.round(completed/total*100)));
   const help=g.moves.filter(m=>m.end<=state.currentTime && m._help).length;
-
-  const game=hanoiProgressAtCursor();
-
-  // Efficiency is meaningful only once the puzzle has actually been solved.
-  const efficiency = game.solved && completedMoves>0
-    ? Math.min(100,Math.round(HANOI_OPTIMAL_START_DISTANCE/completedMoves*100))
-    : null;
-
-  let gameDetail="";
-  if(game.solved){
-    gameDetail=
-      `<div class="game-completion-detail">${completedMoves} moves used</div>`+
-      `<div class="game-completion-detail">${efficiency}% move efficiency</div>`+
-      `<div class="game-completion-detail">${help} help request${help===1?"":"s"}</div>`;
-  }else{
-    gameDetail=
-      `<div class="game-completion-detail">${game.remaining===null ? "—" : game.remaining} optimal moves remaining</div>`+
-      `<div class="game-completion-detail">${completedMoves} moves used</div>`+
-      `<div class="game-completion-detail">${help} help request${help===1?"":"s"}</div>`;
-  }
+  const done=percent===100;
 
   box.innerHTML=
     `<div class="summary-kicker">Trial ${g.trial}</div>`+
-    `<div class="summary-percent">${trialPercent}%</div>`+
-    `<div class="summary-label">trial progress</div>`+
-    `<div class="summary-meta">${completedMoves} / ${g.moves.length} moves<br>${help} help request${help===1?"":"s"}</div>`+
-    `<div class="game-completion-block${game.solved?" solved":""}">`+
-      `<div class="game-completion-label">GAME COMPLETION</div>`+
-      `<div class="game-completion-percent">${game.percent}%${game.solved?" · SOLVED":""}</div>`+
-      gameDetail+
-    `</div>`;
+    `<div class="summary-percent${done?" summary-complete":""}">${percent}%</div>`+
+    `<div class="summary-label">completed</div>`+
+    `<div class="summary-meta">${completed} / ${g.moves.length} moves<br>${help} help request${help===1?"":"s"}</div>`;
 }
 
 function renderAllContextCanvases() {
@@ -714,19 +591,20 @@ function renderPreSurvey(pre) {
   ].join("");
 
   const prior = [
-    surveyKV("Robot interaction before", surveyYesNo(pre.interacted_with_robot_before)),
-    surveyKV("EEG / emotion monitoring before", surveyYesNo(pre.used_eeg_or_emotion_monitoring_before)),
-    surveyKV("Tower of Hanoi before", surveyYesNo(pre.done_tower_of_hanoi_before))
+    surveyKV("Interacted with a robot before", surveyYesNo(pre.interacted_with_robot_before)),
+    surveyKV("Used EEG / emotion-monitoring before", surveyYesNo(pre.used_eeg_or_emotion_monitoring_before)),
+    surveyKV("Done Tower of Hanoi before", surveyYesNo(pre.done_tower_of_hanoi_before))
   ].join("");
 
   let emotion = [
-    surveyRating("Puzzle confidence", pre.puzzle_confidence),
+    surveyRating("Confidence in solving puzzle today", pre.puzzle_confidence),
     surveyRating("Stressed", mood.stressed),
     surveyRating("Calmed", mood.calmed),
     surveyRating("Frustrated", mood.frustrated)
   ].join("");
   if (pre.emotional_state_description) {
-    emotion += `<div class="survey-quote">${escapeHTML(String(pre.emotional_state_description))}</div>`;
+    emotion += `<div class="survey-response-label">Current emotional state</div>
+      <div class="survey-quote">${escapeHTML(String(pre.emotional_state_description))}</div>`;
   }
 
   card.innerHTML = `
@@ -750,14 +628,14 @@ function renderPostSurvey(post) {
   }
 
   const experience = [
-    surveyKV("Overall experience", surveyPill(post.overall_experience_with_robot)),
-    surveyKV("Robot helpfulness", surveyPill(post.robot_helpfulness)),
-    surveyKV("Response timing", surveyPill(post.robot_response_timing)),
-    surveyKV("Awareness of frustration / stress", surveyPill(post.robot_awareness_of_frustration_or_stress))
+    surveyKV("Overall experience with robot", surveyPill(post.overall_experience_with_robot)),
+    surveyKV("Robot was helpful during task", surveyPill(post.robot_helpfulness)),
+    surveyKV("Robot responded to needs at right time", surveyPill(post.robot_response_timing)),
+    surveyKV("Robot seemed aware of frustration / stress", surveyPill(post.robot_awareness_of_frustration_or_stress))
   ].join("");
 
   const source = post.frustration_source || {};
-  let frustration = surveyKV("Experienced frustration", surveyYesNo(post.experienced_frustration));
+  let frustration = surveyKV("Experienced frustration during task", surveyYesNo(post.experienced_frustration));
   if (post.experienced_frustration === true) {
     frustration += `<div class="survey-kv-grid" style="margin-top:8px">
       ${surveyKV("Puzzle", surveyPill(source.puzzle))}
@@ -775,12 +653,13 @@ function renderPostSurvey(post) {
 
   const eeg = post.eeg_headset || {};
   let final = [
-    surveyRating("EEG headset comfort", eeg.comfort_level),
-    surveyRating("Robot safety concerns", post.robot_safety_concerns),
-    surveyRating("Participate in similar study again", post.participate_in_similar_studies_future)
+    surveyRating("Comfort while wearing EEG headset", eeg.comfort_level),
+    surveyRating("Safety concerns working near robot", post.robot_safety_concerns),
+    surveyRating("Likelihood of participating in future studies", post.participate_in_similar_studies_future)
   ].join("");
   if (eeg.discomfort_description) {
-    final += `<div class="survey-quote">${escapeHTML(String(eeg.discomfort_description))}</div>`;
+    final += `<div class="survey-response-label">EEG headset discomfort</div>
+      <div class="survey-quote">${escapeHTML(String(eeg.discomfort_description))}</div>`;
   }
 
   card.innerHTML = `
@@ -816,7 +695,7 @@ async function loadSurveyForParticipant(id) {
   renderSurveySection();
 
   try {
-    const base = encodeURIComponent(id);
+    const base = `data/${encodeURIComponent(id)}`;
     let response = await fetch(`${base}/surveys.json`, {cache:"no-store"});
 
     // Backward-compatible fallback for folders that use survey.json.

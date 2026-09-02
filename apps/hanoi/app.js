@@ -183,7 +183,7 @@ async function loadParticipant(id) {
   el("loadParticipant").disabled = true;
   try {
     const entries = await Promise.all(Object.entries(FILES).map(async ([key, filename]) => {
-      const text = await loadText(`${encodeURIComponent(id)}/${filename}`);
+      const text = await loadText(`data/${encodeURIComponent(id)}/${filename}`);
       return [key, parseCSV(text)];
     }));
     const raw = Object.fromEntries(entries);

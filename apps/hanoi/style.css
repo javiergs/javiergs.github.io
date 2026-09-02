@@ -7,7 +7,7 @@
   --line: #dce5e0;
 
   --brand-deep: #193e2c;
-  --brand-dark: #607B6D; /* #384d42;*/
+  --brand-dark: #384d42;
   --brand-sage: #7f9c8f;
   --brand-sage-2: #98b4aa;
   --brand-light: #c4d9d5;
@@ -993,10 +993,151 @@ h2 {
 }
 
 
-/* Game Completion appears below Trial Progress in the Master Timeline summary. */
-.game-completion-block { width:100%; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); text-align:center; }
-.game-completion-label { color:var(--muted); font-size:.61rem; font-weight:850; letter-spacing:.08em; }
-.game-completion-percent { margin-top:3px; color:var(--brand-deep); font-size:1.25rem; line-height:1.05; font-weight:850; font-variant-numeric:tabular-nums; }
-.game-completion-detail { margin-top:3px; color:#59635d; font-size:.66rem; }
-.game-completion-block.solved .game-completion-percent,
-.game-completion-block.solved .game-completion-detail { color:var(--quality-4); font-weight:800; }
+/* ==========================================================================\n   2026-09-01 consolidated dashboard layout\n   ========================================================================== */
+
+:root { --context-column-width: 190px; }
+
+.site-header {
+  background: var(--brand-dark);
+  border-bottom-color: var(--brand-sage);
+}
+
+.site-header .brand {
+  width: min(1500px, 100%);
+  margin: 0 auto;
+}
+
+.lab-name {
+  margin-bottom: 2px;
+  color: rgba(255,255,255,.82);
+  font-size: clamp(.72rem, 1.15vw, .88rem);
+  font-weight: 750;
+  letter-spacing: .055em;
+}
+
+.top-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--context-column-width);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.top-layout .timeline-card {
+  margin: 0;
+  min-width: 0;
+}
+
+/* Trial summary now lives in the Trial Information card, not the timeline. */
+.timeline-card.aligned-timeline { display: block; }
+.timeline-main { min-width: 0; }
+
+.participant-card {
+  padding: 18px 16px;
+  min-width: 0;
+}
+
+.participant-card .participant-picker {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 9px;
+  width: 100%;
+}
+
+.participant-card .participant-picker > label {
+  color: var(--muted);
+  opacity: 1;
+  font-size: .70rem;
+}
+
+.participant-card select,
+.participant-card button { width: 100%; }
+
+.participant-card button {
+  min-height: 38px;
+  background: var(--brand-dark);
+  border-color: var(--brand-dark);
+  color: #fff;
+}
+
+.experiment-grid {
+  grid-template-columns: minmax(0, 1fr) var(--context-column-width);
+  align-items: stretch;
+}
+
+.hanoi-card,
+.trial-info-card { min-height: 310px; }
+
+.trial-info-card { padding: 18px 14px; }
+.trial-info-mount { margin-top: 12px; height: calc(100% - 48px); }
+.trial-info-empty { color: var(--muted); font-size: .78rem; line-height: 1.45; }
+.trial-info-card .timeline-summary {
+  min-height: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 4px 0 0;
+}
+.trial-info-card .summary-percent { font-size: 2.4rem; }
+
+.legacy-error-field { display: none !important; }
+.move-meta { grid-template-columns: repeat(3, 1fr) !important; }
+
+.snapshot-wide {
+  min-height: 0 !important;
+  margin-top: 16px;
+  padding: 18px;
+}
+.snapshot-wide .snapshot-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  gap: 10px;
+}
+.snapshot-wide .snapshot-group { min-height: 118px; }
+
+.chart-card.has-context-column {
+  grid-template-columns: minmax(0, 1fr) var(--context-column-width) !important;
+}
+
+.site-footer {
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 28px 0 0 !important;
+  padding: 18px clamp(18px, 4vw, 54px);
+  display: block !important;
+  background: var(--brand-dark);
+  border-top: 4px solid var(--brand-sage);
+  color: rgba(255,255,255,.88) !important;
+  text-align: center;
+  font-size: .78rem;
+  letter-spacing: .015em;
+}
+
+.survey-response-label {
+  margin: 10px 0 5px;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: .055em;
+}
+
+@media (max-width: 1050px) {
+  .snapshot-wide .snapshot-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+
+@media (max-width: 850px) {
+  .top-layout,
+  .experiment-grid { grid-template-columns: 1fr !important; }
+  .participant-card .participant-picker {
+    grid-template-columns: minmax(120px, 1fr) auto;
+    align-items: end;
+  }
+  .participant-card .participant-picker > label { grid-column: 1 / -1; }
+  .participant-card button { width: auto; min-width: 86px; }
+}
+
+@media (max-width: 600px) {
+  .lab-name { line-height: 1.35; }
+  .snapshot-wide .snapshot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
