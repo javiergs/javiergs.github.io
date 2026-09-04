@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <title>Hanoi Study Dashboard</title>
+
+  <meta http-equiv="refresh"
+        content="0; url=https://apps.javiergs.phd/hanoi/">
+
+  <link rel="canonical"
+        href="https://apps.javiergs.phd/hanoi/">
+</head>
+
+<body>
+  <p>
+    The Hanoi Study Dashboard has moved to
+    <a href="https://apps.javiergs.phd/hanoi/">
+      apps.javiergs.phd/hanoi/
+    </a>.
+  </p>
+</body>
+</html>
