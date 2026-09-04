@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSC 5100 IoT Check-in</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #f7f7f7;
+      color: #222;
+    }
+
+    h1 {
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      margin-bottom: 2rem;
+      color: #555;
+    }
+
+    .card {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .status {
+      margin-bottom: 1rem;
+      color: #555;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 0.75rem;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background: #f0f0f0;
+    }
+
+    .success {
+      color: #167c2f;
+      font-weight: bold;
+    }
+
+    .error {
+      color: #b00020;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>CSC 5100 — IoT Check-in</h1>
+
+  <div class="subtitle">
+    Publish your check-in through MQTT.
+    When AWS IoT Core receives and processes your message,
+    your name will appear below.
+  </div>
+
+  <div class="card">
+    <div id="status" class="status">
+      Loading check-ins...
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Name</th>
+          <th>Received</th>
+        </tr>
+      </thead>
+
+      <tbody id="students"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_URL =
+      "https://f9ggrspnrj.execute-api.us-west-2.amazonaws.com/default/CSC5100CheckinAPI";
+
+    function formatTime(timestamp) {
+      if (!timestamp) {
+        return "";
+      }
+
+      return new Date(timestamp).toLocaleString();
+    }
+
+    async function loadCheckins() {
+      const status = document.getElementById("status");
+      const table = document.getElementById("students");
+
+      try {
+        const response = await fetch(API_URL);
+
+        if (!response.ok) {
+          throw new Error("API request failed");
+        }
+
+        const students = await response.json();
+
+        table.innerHTML = "";
+
+        students.forEach(student => {
+          const row = document.createElement("tr");
+
+          row.innerHTML = `
+            <td class="success">✓ Received</td>
+            <td>${student.name}</td>
+            <td>${formatTime(student.receivedAt)}</td>
+          `;
+
+          table.appendChild(row);
+        });
+
+        status.textContent =
+          `${students.length} check-in${students.length === 1 ? "" : "s"} received`;
+
+      } catch (error) {
+        console.error(error);
+
+        status.textContent =
+          "Unable to load check-ins.";
+
+        status.className = "status error";
+      }
+    }
+
+    loadCheckins();
+
+    setInterval(loadCheckins, 5000);
+  </script>
+</body>
+</html>
