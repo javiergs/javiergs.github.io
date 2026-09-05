@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pupil Surface Gaze Viewer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">CAL for HCI</div>
+      <h1>Pupil Surface Gaze Viewer</h1>
+    </div>
+    <div class="status" id="status">Loading P03 gaze data…</div>
+  </header>
+
+  <main class="layout">
+    <section class="viewer-card">
+      <div class="viewer-toolbar">
+        <div>
+          <strong>Surface calibration</strong>
+          <span class="muted">Drag the four markers to match the experimental marker locations.</span>
+        </div>
+        <div class="toolbar-actions">
+          <button id="resetMarkers" type="button">Reset markers</button>
+          <button id="exportConfig" type="button">Export marker config</button>
+        </div>
+      </div>
+
+      <div id="stageWrap" class="stage-wrap">
+        <div id="stage" class="stage" aria-label="Façade with adjustable surface markers and gaze overlay">
+          <img id="facade" src="assets/facade.png" alt="Façade stimulus used in the study">
+          <div class="surface-outline" id="surfaceOutline" aria-hidden="true"></div>
+
+          <button class="marker marker-tl" id="markerTL" data-marker="tl" aria-label="Top-left surface marker">TL</button>
+          <button class="marker marker-tr" id="markerTR" data-marker="tr" aria-label="Top-right surface marker">TR</button>
+          <button class="marker marker-bl" id="markerBL" data-marker="bl" aria-label="Bottom-left surface marker">BL</button>
+          <button class="marker marker-br" id="markerBR" data-marker="br" aria-label="Bottom-right surface marker">BR</button>
+
+          <div id="gazeTrail" class="gaze-trail" aria-hidden="true"></div>
+          <div id="gazePoint" class="gaze-point" aria-label="Current gaze point"></div>
+        </div>
+      </div>
+
+      <div class="playback">
+        <button id="playPause" class="play" type="button" aria-label="Play gaze data">▶</button>
+        <div class="time-stack">
+          <input id="timeSlider" type="range" min="0" max="1000" value="0" step="1" aria-label="Gaze timeline">
+          <div class="time-row">
+            <span id="timeLabel">00:00.000</span>
+            <span id="durationLabel">00:00.000</span>
+          </div>
+        </div>
+        <label class="speed-label">Speed
+          <select id="speed">
+            <option value="0.25">0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <h2>Current sample</h2>
+        <dl class="stats">
+          <div><dt>Surface X</dt><dd id="sx">—</dd></div>
+          <div><dt>Surface Y</dt><dd id="sy">—</dd></div>
+          <div><dt>Confidence</dt><dd id="confidence">—</dd></div>
+          <div><dt>Step</dt><dd id="step">—</dd></div>
+          <div><dt>Sample</dt><dd id="sampleIndex">—</dd></div>
+        </dl>
+      </section>
+
+      <section class="panel">
+        <h2>Display</h2>
+        <label class="check"><input id="showTrail" type="checkbox" checked> Show recent gaze trail</label>
+        <label class="check"><input id="invertY" type="checkbox" checked> Invert surface Y for screen coordinates</label>
+        <label class="check"><input id="confidenceFilter" type="checkbox"> Hide gaze below confidence</label>
+        <label class="field">Minimum confidence
+          <input id="minConfidence" type="number" value="0.60" min="0" max="1" step="0.05">
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2>Marker positions</h2>
+        <p class="muted small">Values are percentages of the full stimulus image. You can also type exact values.</p>
+        <div id="markerInputs" class="marker-inputs"></div>
+      </section>
+
+      <section class="panel note">
+        <h2>Why this works</h2>
+        <p><code>surfaceX</code>/<code>surfaceY</code> are already normalized Pupil Surface coordinates. The four draggable points define the surface quadrilateral on this clean reference image; a projective transform maps each gaze sample into it.</p>
+        <p>Later, affective signals can be synchronized against the same device/local timestamp and displayed at the same playback cursor.</p>
+      </section>
+    </aside>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
