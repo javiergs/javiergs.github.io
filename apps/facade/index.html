@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stimulus-Synchronized Gaze Viewer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">CAL for HCI</div>
+      <h1>Stimulus-Synchronized Gaze Viewer</h1>
+      <p>Canonical façade + stimulus AOIs + participant response on one master stimulus clock.</p>
+    </div>
+    <div class="status" id="status">Loading P03…</div>
+  </header>
+
+  <main class="layout">
+    <section class="viewer-card">
+      <div class="viewer-toolbar">
+        <div class="toolbar-group">
+          <label>Participant
+            <select id="participant"><option value="P03">P03</option></select>
+          </label>
+          <label>Overlay
+            <select id="overlayMode">
+              <option value="gaze" selected>Gaze point + trail</option>
+              <option value="heat-current">Heatmap · current stimulus</option>
+              <option value="heat-window">Heatmap · last 3 seconds</option>
+              <option value="stimulus">Stimulus only</option>
+            </select>
+          </label>
+        </div>
+        <div class="toolbar-actions">
+          <button id="resetSurface" type="button">Reset surface</button>
+          <button id="exportConfig" type="button">Export config</button>
+        </div>
+      </div>
+
+      <div class="stage-wrap">
+        <div id="stage" class="stage" aria-label="Façade stimulus with gaze and stimulus overlays">
+          <img id="facade" src="assets/facade.png" alt="Canonical façade stimulus">
+          <canvas id="heatmap" aria-hidden="true"></canvas>
+          <svg id="stimulusOverlay" class="stimulus-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <div class="surface-outline" id="surfaceOutline" aria-hidden="true"></div>
+
+          <button class="marker" id="markerTL" data-marker="tl" aria-label="Top-left surface point">TL</button>
+          <button class="marker" id="markerTR" data-marker="tr" aria-label="Top-right surface point">TR</button>
+          <button class="marker" id="markerBL" data-marker="bl" aria-label="Bottom-left surface point">BL</button>
+          <button class="marker" id="markerBR" data-marker="br" aria-label="Bottom-right surface point">BR</button>
+
+          <div id="gazeTrail" class="gaze-trail" aria-hidden="true"></div>
+          <div id="gazePoint" class="gaze-point" aria-label="Current gaze point"></div>
+          <div id="stimulusBadge" class="stimulus-badge">No active stimulus</div>
+        </div>
+      </div>
+
+      <div id="stimulusTrack" class="stimulus-track" aria-label="Stimulus events"></div>
+
+      <div class="playback">
+        <button id="playPause" class="play" type="button">▶</button>
+        <div class="time-stack">
+          <input id="timeSlider" type="range" min="0" max="2590" value="0" step="1" aria-label="Stimulus timeline">
+          <div class="time-row">
+            <span><strong id="stimulusTime">00:00.0</strong> stimulus</span>
+            <span id="durationLabel">04:19.0</span>
+          </div>
+        </div>
+        <label>Speed
+          <select id="speed">
+            <option value="0.25">0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="panel sync-panel">
+        <div class="panel-heading">
+          <h2>Synchronization</h2>
+          <span id="syncQuality" class="quality">Not scored</span>
+        </div>
+        <p class="muted small">Stimulus time is the master clock. Offset = recording time − stimulus time.</p>
+        <label class="field">Recording offset (s)
+          <input id="syncOffset" type="number" value="50.86" step="0.01">
+        </label>
+        <div class="nudge-row">
+          <button data-nudge="-1">−1 s</button>
+          <button data-nudge="-0.1">−0.1</button>
+          <button data-nudge="0.1">+0.1</button>
+          <button data-nudge="1">+1 s</button>
+        </div>
+        <button id="autoSync" class="primary" type="button">Estimate from stimulus responses</button>
+        <div class="sync-readout">
+          <span>Stimulus <strong id="syncStimulusTime">—</strong></span>
+          <span>Recording <strong id="recordingTime">—</strong></span>
+        </div>
+        <p id="syncMessage" class="muted small">Starter offset uses the previously identified P03 action anchor; use Auto-sync or nudge it after AOIs are refined.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Current state</h2>
+        <dl class="stats">
+          <div><dt>Stimulus</dt><dd id="activeStimulus">None</dd></div>
+          <div><dt>Gaze X</dt><dd id="sx">—</dd></div>
+          <div><dt>Gaze Y</dt><dd id="sy">—</dd></div>
+          <div><dt>Confidence</dt><dd id="confidence">—</dd></div>
+          <div><dt>Fixation</dt><dd id="fixationId">—</dd></div>
+          <div><dt>Sample</dt><dd id="sampleIndex">—</dd></div>
+        </dl>
+      </section>
+
+      <section class="panel">
+        <h2>Display</h2>
+        <label class="check"><input id="showStimulus" type="checkbox" checked> Show active stimulus AOI</label>
+        <label class="check"><input id="showTrail" type="checkbox" checked> Show recent gaze trail</label>
+        <label class="check"><input id="showSurface" type="checkbox"> Show surface calibration</label>
+        <label class="check"><input id="confidenceFilter" type="checkbox" checked> Hide low-confidence gaze</label>
+        <label class="field">Minimum confidence
+          <input id="minConfidence" type="number" value="0.60" min="0" max="1" step="0.05">
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2>Surface mapping</h2>
+        <p class="muted small">The four points map normalized Pupil Surface coordinates onto the canonical façade. Drag only if the gaze overlay needs registration correction.</p>
+        <div id="markerInputs" class="marker-inputs"></div>
+      </section>
+
+      <section class="panel note">
+        <h2>Analysis model</h2>
+        <p><strong>Stimulus video is not required during analysis.</strong> The dashboard reconstructs stimulus state from <code>stimuli.json</code> and keeps the exact façade image fixed.</p>
+        <p>Automatic synchronization searches for an offset where gaze enters the highlighted AOIs shortly after multiple stimulus onsets. The door is weighted more strongly, but it is not trusted alone.</p>
+      </section>
+    </aside>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
