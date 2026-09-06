@@ -498,7 +498,7 @@
     const label=$("participantVideoName");
     const missing=$("participantVideoMissing");
     if(!video || !source) return;
-    const filename=`${id}.mp4`;
+    const filename=`${id}.mov`;
     const src=`videos/${filename}`;
     if(label) label.textContent=filename;
     if(missing){
@@ -507,6 +507,7 @@
     }
     video.pause();
     source.src=src;
+    source.type="video/quicktime";
     const showMissing=()=>{ if(missing) missing.hidden=false; };
     const hideMissing=()=>{ if(missing) missing.hidden=true; };
     video.onerror=showMissing;

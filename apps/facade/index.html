@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Heart Castle Facade Study Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
   <header class="site-header">
@@ -72,21 +72,42 @@
         </div>
       </div>
 
-      <div class="stage-wrap">
-        <div id="stage" class="stage" aria-label="Façade stimulus with gaze and stimulus overlays">
-          <img id="facade" src="assets/stimulus/baseline.jpg" alt="Façade stimulus state">
-          <canvas id="heatmap" aria-hidden="true"></canvas>
-          <div class="surface-outline" id="surfaceOutline" aria-hidden="true"></div>
+      <div class="visual-row">
+        <div class="stage-wrap">
+          <div id="stage" class="stage" aria-label="Façade stimulus with gaze and stimulus overlays">
+            <img id="facade" src="assets/stimulus/baseline.jpg" alt="Façade stimulus state">
+            <canvas id="heatmap" aria-hidden="true"></canvas>
+            <div class="surface-outline" id="surfaceOutline" aria-hidden="true"></div>
 
-          <button class="marker" id="markerTL" data-marker="tl" aria-label="Top-left surface point">TL</button>
-          <button class="marker" id="markerTR" data-marker="tr" aria-label="Top-right surface point">TR</button>
-          <button class="marker" id="markerBL" data-marker="bl" aria-label="Bottom-left surface point">BL</button>
-          <button class="marker" id="markerBR" data-marker="br" aria-label="Bottom-right surface point">BR</button>
+            <button class="marker" id="markerTL" data-marker="tl" aria-label="Top-left surface point">TL</button>
+            <button class="marker" id="markerTR" data-marker="tr" aria-label="Top-right surface point">TR</button>
+            <button class="marker" id="markerBL" data-marker="bl" aria-label="Bottom-left surface point">BL</button>
+            <button class="marker" id="markerBR" data-marker="br" aria-label="Bottom-right surface point">BR</button>
 
-          <div id="gazeTrail" class="gaze-trail" aria-hidden="true"></div>
-          <div id="gazePoint" class="gaze-point" aria-label="Current gaze point"></div>
-          <div id="stimulusBadge" class="stimulus-badge">No active stimulus</div>
+            <div id="gazeTrail" class="gaze-trail" aria-hidden="true"></div>
+            <div id="gazePoint" class="gaze-point" aria-label="Current gaze point"></div>
+            <div id="stimulusBadge" class="stimulus-badge">No active stimulus</div>
+          </div>
         </div>
+
+        <section class="participant-video-card" aria-label="Original participant video">
+          <div class="participant-video-card-head">
+            <div>
+              <h2>Original participant video</h2>
+              <p>Independent reference</p>
+            </div>
+            <span id="participantVideoName" class="video-file-name">P12.mov</span>
+          </div>
+          <div class="participant-video-wrap compact">
+            <video id="participantVideo" controls preload="metadata" playsinline>
+              <source id="participantVideoSource" src="videos/P12.mov" type="video/quicktime">
+              Your browser does not support HTML video.
+            </video>
+            <div id="participantVideoMissing" class="video-missing" hidden>
+              Add <strong>P12.mov</strong> to the <code>videos</code> folder to view the original recording.
+            </div>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -131,7 +152,7 @@
     </aside>
   </main>
 
-  <section class="lower-workspace">
+  <section class="lower-workspace admin-only">
     <div class="admin-stack">
       <section class="panel sync-panel admin-panel">
         <div class="panel-heading">
@@ -162,29 +183,10 @@
         <div id="markerInputs" class="marker-inputs"></div>
       </section>
     </div>
-
-    <section class="panel participant-video-panel">
-      <div class="panel-heading">
-        <div>
-          <h2>Original participant video</h2>
-          <p class="muted small">Independent reference recording for the selected participant. Its playback does not control the dashboard timeline.</p>
-        </div>
-        <span id="participantVideoName" class="video-file-name">P12.mp4</span>
-      </div>
-      <div class="participant-video-wrap">
-        <video id="participantVideo" controls preload="metadata" playsinline>
-          <source id="participantVideoSource" src="videos/P12.mp4" type="video/mp4">
-          Your browser does not support HTML video.
-        </video>
-        <div id="participantVideoMissing" class="video-missing" hidden>
-          Add <strong>P12.mp4</strong> to the <code>videos</code> folder to view the original recording.
-        </div>
-      </div>
-    </section>
   </section>
 
   <footer class="site-footer" aria-hidden="true"></footer>
 
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

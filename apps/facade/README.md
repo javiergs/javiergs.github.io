@@ -43,3 +43,9 @@ The cumulative heatmap now accumulates density in a floating-point field rather 
 - Participant videos are loaded automatically from `videos/<participant>.mp4` (for example, `videos/P12.mp4`).
 - The original video uses its own native playback controls and is intentionally independent of the synchronized dashboard timeline.
 - If a participant video is not present, the panel shows the expected filename instead of breaking the dashboard.
+
+## v21 changes
+- Original participant reference videos now use `videos/PXX.mov` instead of MP4.
+- The original participant video is displayed on the same row as the main façade/gaze visualization so both can be viewed simultaneously.
+- The reference video remains independent and retains its own playback/seek controls.
+- Synchronization and Surface mapping remain in the lower administrative area.
