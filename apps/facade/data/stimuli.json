@@ -10,8 +10,15 @@
       "weight": 1.5,
       "syncAnchor": true,
       "shapes": [
-        {"type":"rect","x":41.5,"y":56.0,"w":17.0,"h":35.0}
-      ]
+        {
+          "type": "rect",
+          "x": 41.5,
+          "y": 56.0,
+          "w": 17.0,
+          "h": 35.0
+        }
+      ],
+      "frame": "assets/stimulus/zone-01-door.jpg"
     },
     {
       "id": "top-figure",
@@ -20,8 +27,15 @@
       "end": 70.0,
       "weight": 1.0,
       "shapes": [
-        {"type":"rect","x":46.1,"y":20.5,"w":7.8,"h":17.0}
-      ]
+        {
+          "type": "rect",
+          "x": 46.1,
+          "y": 20.5,
+          "w": 7.8,
+          "h": 17.0
+        }
+      ],
+      "frame": "assets/stimulus/zone-02-top-figure.jpg"
     },
     {
       "id": "central-group",
@@ -30,8 +44,15 @@
       "end": 103.0,
       "weight": 1.0,
       "shapes": [
-        {"type":"ellipse","cx":50.0,"cy":48.5,"rx":9.0,"ry":5.5}
-      ]
+        {
+          "type": "ellipse",
+          "cx": 50.0,
+          "cy": 48.5,
+          "rx": 9.0,
+          "ry": 5.5
+        }
+      ],
+      "frame": "assets/stimulus/zone-03-central-group.jpg"
     },
     {
       "id": "wild-men",
@@ -40,9 +61,22 @@
       "end": 157.0,
       "weight": 1.0,
       "shapes": [
-        {"type":"rect","x":31.5,"y":53.0,"w":8.0,"h":21.0},
-        {"type":"rect","x":60.5,"y":53.0,"w":8.0,"h":21.0}
-      ]
+        {
+          "type": "rect",
+          "x": 31.5,
+          "y": 53.0,
+          "w": 8.0,
+          "h": 21.0
+        },
+        {
+          "type": "rect",
+          "x": 60.5,
+          "y": 53.0,
+          "w": 8.0,
+          "h": 21.0
+        }
+      ],
+      "frame": "assets/stimulus/zone-04-wild-men.jpg"
     },
     {
       "id": "door-bright",
@@ -51,8 +85,15 @@
       "end": 182.0,
       "weight": 1.3,
       "shapes": [
-        {"type":"rect","x":41.5,"y":56.0,"w":17.0,"h":35.0}
-      ]
+        {
+          "type": "rect",
+          "x": 41.5,
+          "y": 56.0,
+          "w": 17.0,
+          "h": 35.0
+        }
+      ],
+      "frame": "assets/stimulus/zone-05-door-bright.jpg"
     },
     {
       "id": "corner-elements",
@@ -61,9 +102,22 @@
       "end": 215.0,
       "weight": 1.0,
       "shapes": [
-        {"type":"ellipse","cx":19.3,"cy":63.0,"rx":3.2,"ry":3.7},
-        {"type":"ellipse","cx":80.7,"cy":63.0,"rx":3.2,"ry":3.7}
-      ]
+        {
+          "type": "ellipse",
+          "cx": 19.3,
+          "cy": 63.0,
+          "rx": 3.2,
+          "ry": 3.7
+        },
+        {
+          "type": "ellipse",
+          "cx": 80.7,
+          "cy": 63.0,
+          "rx": 3.2,
+          "ry": 3.7
+        }
+      ],
+      "frame": "assets/stimulus/zone-06-corners.jpg"
     },
     {
       "id": "lateral-figures",
@@ -72,9 +126,22 @@
       "end": 228.0,
       "weight": 1.0,
       "shapes": [
-        {"type":"ellipse","cx":40.5,"cy":39.0,"rx":4.0,"ry":5.0},
-        {"type":"ellipse","cx":59.5,"cy":39.0,"rx":4.0,"ry":5.0}
-      ]
+        {
+          "type": "ellipse",
+          "cx": 40.5,
+          "cy": 39.0,
+          "rx": 4.0,
+          "ry": 5.0
+        },
+        {
+          "type": "ellipse",
+          "cx": 59.5,
+          "cy": 39.0,
+          "rx": 4.0,
+          "ry": 5.0
+        }
+      ],
+      "frame": "assets/stimulus/zone-07-lateral.jpg"
     },
     {
       "id": "upper-four",
@@ -83,8 +150,15 @@
       "end": 240.0,
       "weight": 1.0,
       "shapes": [
-        {"type":"rect","x":13.5,"y":12.0,"w":73.0,"h":16.0}
-      ]
+        {
+          "type": "rect",
+          "x": 13.5,
+          "y": 12.0,
+          "w": 73.0,
+          "h": 16.0
+        }
+      ],
+      "frame": "assets/stimulus/zone-08-upper-four.jpg"
     }
   ],
   "sync": {
@@ -92,5 +166,6 @@
     "primaryAnchorTime": 8.0,
     "method": "Align the participant's first sustained gaze response inside the door AOI to the door-opening event, then use later AOI responses as a validation score.",
     "note": "The behavioral response can lag stimulus onset, so the resulting offset is an estimate and may be manually refined."
-  }
+  },
+  "baselineFrame": "assets/stimulus/baseline.jpg"
 }

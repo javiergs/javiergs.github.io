@@ -309,3 +309,11 @@ body {
   .timeline-grid{grid-template-columns:76px minmax(0,1fr)}
   .timeline-meta-row{margin-left:86px;display:block}
 }
+
+/* v10: actual stimulus-state frames + analysis view + multi-color heatmap. */
+#facade { transition: filter .15s ease, opacity .15s ease; }
+#facade.desaturated { filter: grayscale(1) contrast(.92) brightness(1.08); }
+#heatmap { z-index: 5; opacity: .88; mix-blend-mode: normal; }
+.stimulus-overlay { z-index: 6; }
+.heatmap-key { display:grid;grid-template-columns:auto minmax(70px,1fr) auto;align-items:center;gap:7px;margin:5px 0 3px 24px;color:var(--muted);font-size:10px; }
+.heatmap-key i { display:block;height:7px;border-radius:999px;background:linear-gradient(90deg,#142db9 0%,#00beff 25%,#00d25f 50%,#ffe100 75%,#eb2323 100%); }

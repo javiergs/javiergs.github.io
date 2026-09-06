@@ -2,7 +2,7 @@
   const $ = id => document.getElementById(id);
   const stage = $("stage"), slider = $("timeSlider"), heatmap = $("heatmap"), heatCtx = heatmap.getContext("2d");
   const gazePoint = $("gazePoint"), gazeTrail = $("gazeTrail"), stimulusOverlay = $("stimulusOverlay"), outline = $("surfaceOutline");
-  const status = $("status"), syncOffsetInput = $("syncOffset"), overlayMode = $("overlayMode");
+  const status = $("status"), syncOffsetInput = $("syncOffset"), overlayMode = $("overlayMode"), facadeView = $("facadeView"), facade = $("facade");
   const showTrail = $("showTrail"), showStimulus = $("showStimulus"), showHeatmap = $("showHeatmap"), showSurface = $("showSurface"), confidenceFilter = $("confidenceFilter"), minConfidence = $("minConfidence");
 
   const DEFAULT_MARKERS = {
@@ -96,7 +96,16 @@
   }
   function eventContains(event,p){return event.shapes?.some(s=>shapeContains(s,p));}
   function renderStimulus(t){
-    const e=activeEvent(t); $("activeStimulus").textContent=e?e.label:"None"; $("stimulusBadge").textContent=e?e.label:"No active stimulus";
+    const e=activeEvent(t);
+    const inVideo=t>=0 && t<=stimuli.duration;
+    $("activeStimulus").textContent=e?e.label:(inVideo?"Wait / baseline":"Outside stimulus video");
+    $("stimulusBadge").textContent=e?e.label:(inVideo?"Wait / baseline":"Outside stimulus video");
+
+    const analysis=facadeView.value==="analysis";
+    const wantedSrc=analysis ? (stimuli.baselineFrame||"assets/stimulus/baseline.jpg") : (e?.frame || stimuli.baselineFrame || "assets/stimulus/baseline.jpg");
+    if(facade.getAttribute("src")!==wantedSrc) facade.setAttribute("src",wantedSrc);
+    facade.classList.toggle("desaturated",analysis);
+
     stimulusOverlay.innerHTML="";
     document.querySelectorAll(".stimulus-segment").forEach(b=>b.classList.toggle("active",e&&b.dataset.id===e.id));
     if(!e||!showStimulus.checked)return;
@@ -178,29 +187,52 @@
   }
   function clearHeatmap(){heatCtx.clearRect(0,0,heatmap.width,heatmap.height)}
   function ensureCanvas(){const r=stage.getBoundingClientRect(),w=Math.max(1,Math.round(r.width*devicePixelRatio)),h=Math.max(1,Math.round(r.height*devicePixelRatio));if(heatmap.width!==w||heatmap.height!==h){heatmap.width=w;heatmap.height=h}}
-  function drawHeatPoint(xPct,yPct,alpha=.11){
-    const x=xPct/100*heatmap.width,y=yPct/100*heatmap.height,r=Math.max(18,heatmap.width*.028),g=heatCtx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,`rgba(255,80,0,${alpha})`);g.addColorStop(.45,`rgba(255,180,0,${alpha*.7})`);g.addColorStop(1,"rgba(255,220,0,0)");heatCtx.fillStyle=g;heatCtx.fillRect(x-r,y-r,r*2,r*2);
+  function heatColor(v){
+    const stops=[
+      [0.00,[20,45,185]],
+      [0.25,[0,190,255]],
+      [0.50,[0,210,95]],
+      [0.75,[255,225,0]],
+      [1.00,[235,35,35]]
+    ];
+    v=clamp(v,0,1);
+    for(let i=1;i<stops.length;i++){
+      if(v<=stops[i][0]){const [p0,c0]=stops[i-1],[p1,c1]=stops[i],q=(v-p0)/(p1-p0);return c0.map((c,j)=>Math.round(c+(c1[j]-c)*q));}
+    }
+    return stops.at(-1)[1];
   }
   function renderHeatmap(t){
     ensureCanvas(); clearHeatmap();
-    heatmap.style.display = showHeatmap.checked ? "block" : "none";
-    if(!showHeatmap.checked) return;
-    // Cumulative participant heatmap across all recorded data available up to the current synchronized time.
-    const recStart=recordingStartSec;
-    const recEnd=Math.min(t,recordingEndSec);
-    if(recEnd<=recStart) return;
-    let i=nearestGazeIndex(recStart);
-    if(i<0)return;
+    heatmap.style.display=showHeatmap.checked?"block":"none";
+    if(!showHeatmap.checked)return;
+    const recStart=recordingStartSec, recEnd=Math.min(t,recordingEndSec);
+    if(recEnd<=recStart)return;
+
+    const scale=.30, w=Math.max(120,Math.round(heatmap.width*scale)), h=Math.max(80,Math.round(heatmap.height*scale));
+    const density=document.createElement("canvas"); density.width=w; density.height=h;
+    const dctx=density.getContext("2d"); dctx.globalCompositeOperation="lighter";
+    const radius=Math.max(10,w*.025);
+    let i=nearestGazeIndex(recStart), count=0; if(i<0)return;
     while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>recStart)i--;
-    let count=0;
     for(;i<gaze.length;i++){
-      const rt=gaze[i].deviceTimestamp-recordingZero;
-      if(rt>recEnd)break;
-      if(rt<recStart||!validGaze(gaze[i]))continue;
-      if(count++%5)continue;
-      const p=mapSurface(gaze[i].surfaceX,gaze[i].surfaceY);
-      drawHeatPoint(p.x,p.y,.085);
+      const rt=gaze[i].deviceTimestamp-recordingZero; if(rt>recEnd)break;
+      const r=gaze[i]; if(rt<recStart||!validGaze(r))continue;
+      if(count++%4)continue;
+      const p=mapSurface(r.surfaceX,r.surfaceY),x=p.x/100*w,y=p.y/100*h;
+      const gr=dctx.createRadialGradient(x,y,0,x,y,radius);
+      gr.addColorStop(0,"rgba(255,255,255,.085)");gr.addColorStop(.45,"rgba(255,255,255,.045)");gr.addColorStop(1,"rgba(255,255,255,0)");
+      dctx.fillStyle=gr; dctx.fillRect(x-radius,y-radius,radius*2,radius*2);
     }
+    const src=dctx.getImageData(0,0,w,h), out=dctx.createImageData(w,h);
+    let maxA=0; for(let k=3;k<src.data.length;k+=4)maxA=Math.max(maxA,src.data[k]);
+    if(maxA<2)return;
+    for(let k=0;k<src.data.length;k+=4){
+      const a=src.data[k+3]; if(a<3)continue;
+      const v=Math.pow(a/maxA,.72), c=heatColor(v);
+      out.data[k]=c[0];out.data[k+1]=c[1];out.data[k+2]=c[2];out.data[k+3]=Math.round(35+205*v);
+    }
+    const colored=document.createElement("canvas");colored.width=w;colored.height=h;colored.getContext("2d").putImageData(out,0,0);
+    heatCtx.imageSmoothingEnabled=true;heatCtx.drawImage(colored,0,0,heatmap.width,heatmap.height);
   }
 
   function renderAt(t){
@@ -279,35 +311,35 @@
   function findDoorFixationAnchor(){
     const door=stimuli.events.find(e=>e.syncAnchor)||stimuli.events.find(e=>e.id==="door-open");
     if(!door)return null;
-    const candidates=fixationDoorCandidates();
+    let candidates=fixationDoorCandidates().filter(c=>c.recordingTime<=90);
     if(!candidates.length)return null;
-    // Use the current offset as a coarse estimate, then snap to the strongest nearby
-    // fixation on the door. This avoids choosing incidental door looks during recorder lead-in.
-    const currentOffset=+syncOffsetInput.value||0;
-    const expected=currentOffset+door.start;
-    const nearby=candidates.filter(c=>Math.abs(c.recordingTime-expected)<=15);
-    const pool=nearby.length?nearby:candidates;
-    pool.sort((a,b)=>{
-      const qa=a.ratio*Math.min(1,a.fixation.durationMs/180);
-      const qb=b.ratio*Math.min(1,b.fixation.durationMs/180);
-      const da=Math.abs(a.recordingTime-expected), db=Math.abs(b.recordingTime-expected);
-      return (qb-.012*db)-(qa-.012*da);
+
+    // The door gives the primary behavioral anchor.  We then test each plausible
+    // door fixation against Zones 2–8 and choose the alignment with the strongest
+    // overall agreement.  This avoids locking onto an incidental early look at the door.
+    candidates=candidates.map(c=>{
+      const offset=c.recordingTime-door.start;
+      const validation=scoreOffset(offset);
+      const doorQuality=c.ratio*Math.min(1,c.fixation.durationMs/180);
+      const combined=validation.score*.72 + doorQuality*.28;
+      return {...c,offset,validation,combined};
     });
-    const c=pool[0];
-    return {recordingTime:c.recordingTime,stimulusTime:door.start,offset:c.recordingTime-door.start,event:door,fixation:c.fixation,ratio:c.ratio};
+    candidates.sort((a,b)=>b.combined-a.combined || b.validation.hits-a.validation.hits || a.recordingTime-b.recordingTime);
+    const c=candidates[0];
+    return {recordingTime:c.recordingTime,stimulusTime:door.start,offset:c.offset,event:door,fixation:c.fixation,ratio:c.ratio,validation:c.validation};
   }
 
   function autoSync(){
-    const btn=$("autoSync");btn.disabled=true;btn.textContent="Finding door gaze…";
-    $("syncMessage").textContent="Looking for a fixation on the door near the current synchronization estimate…";
+    const btn=$("autoSync");btn.disabled=true;btn.textContent="Finding door fixation…";
+    $("syncMessage").textContent="Testing early door fixations and validating each candidate against Zones 2–8…";
     setTimeout(()=>{
       const anchor=findDoorFixationAnchor();
       if(!anchor){
-        $("syncMessage").textContent="No qualifying fixation on the door was found. Use the offset controls to place the video approximately, then try again.";
+        $("syncMessage").textContent="No qualifying early fixation on the door was found. The offset can still be adjusted manually.";
         btn.disabled=false;btn.textContent="Sync from door fixation";return;
       }
       syncOffsetInput.value=anchor.offset.toFixed(2);
-      const validation=scoreOffset(anchor.offset);
+      const validation=anchor.validation||scoreOffset(anchor.offset);
       updateQuality(validation);renderStimulusTrack();renderAt(sessionTime);
       $("syncMessage").textContent=`Door fixation #${anchor.fixation.id} at recording ${fmt(anchor.recordingTime)} is aligned to door opening at video ${fmt(anchor.stimulusTime)}. Estimated video start: ${fmt(anchor.offset)} into the participant recording. Door-AOI coverage during the fixation: ${(anchor.ratio*100).toFixed(0)}%. Later AOIs provide a validation score (${validation.hits}/${validation.used}).`;
       btn.disabled=false;btn.textContent="Sync from door fixation";
@@ -326,7 +358,7 @@
   syncOffsetInput.addEventListener("input",()=>{updateQuality();renderStimulusTrack();renderAt(sessionTime)});
   $("autoSync").addEventListener("click",autoSync);
   document.querySelectorAll("[data-nudge]").forEach(b=>b.addEventListener("click",()=>{syncOffsetInput.value=(+syncOffsetInput.value + +b.dataset.nudge).toFixed(2);updateQuality();renderStimulusTrack();renderAt(sessionTime)}));
-  [overlayMode,showTrail,showStimulus,showHeatmap,showSurface,confidenceFilter,minConfidence].forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(sessionTime)}));
+  [facadeView,overlayMode,showTrail,showStimulus,showHeatmap,showSurface,confidenceFilter,minConfidence].forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(sessionTime)}));
   Object.values(markerEls).forEach(el=>el.addEventListener("pointerdown",e=>beginDrag(el,e)));
   $("resetSurface").addEventListener("click",()=>{markers=structuredClone(DEFAULT_MARKERS);renderMarkers();updateQuality();renderAt(sessionTime)});
   $("exportConfig").addEventListener("click",()=>{

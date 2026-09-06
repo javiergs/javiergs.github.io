@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Heart Castle Facade Study Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
   <header class="site-header">
@@ -26,6 +26,12 @@
         <div class="toolbar-group">
           <label>Participant
             <select id="participant"><option value="P03">P03</option></select>
+          </label>
+          <label>Facade view
+            <select id="facadeView">
+              <option value="stimulus" selected>Actual stimulus</option>
+              <option value="analysis">Analysis (desaturated)</option>
+            </select>
           </label>
           <label>Gaze display
             <select id="overlayMode">
@@ -71,7 +77,7 @@
 
       <div class="stage-wrap">
         <div id="stage" class="stage" aria-label="Façade stimulus with gaze and stimulus overlays">
-          <img id="facade" src="assets/facade.png" alt="Canonical façade stimulus">
+          <img id="facade" src="assets/stimulus/baseline.jpg" alt="Façade stimulus state">
           <canvas id="heatmap" aria-hidden="true"></canvas>
           <svg id="stimulusOverlay" class="stimulus-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
           <div class="surface-outline" id="surfaceOutline" aria-hidden="true"></div>
@@ -96,7 +102,7 @@
         </div>
         <p class="muted small">The slider spans the complete synchronized session. Offset = recording time − stimulus-video time.</p>
         <label class="field">Recording offset (s)
-          <input id="syncOffset" type="number" value="50.86" step="0.01">
+          <input id="syncOffset" type="number" value="16.45" step="0.01">
         </label>
         <div class="nudge-row">
           <button data-nudge="-1">−1 s</button>
@@ -109,7 +115,7 @@
           <span>Video <strong id="syncStimulusTime">—</strong></span>
           <span>Recording <strong id="recordingTime">—</strong></span>
         </div>
-        <p id="syncMessage" class="muted small">Auto-sync uses a fixation on the opening door as the primary anchor. The current offset provides a coarse location so incidental pre-video looks at the door are not selected; later stimulus AOIs are used as validation.</p>
+        <p id="syncMessage" class="muted small">Auto-sync uses a fixation on the opening door as the primary anchor, then tests Zones 2–8 as independent behavioral evidence for the alignment.</p>
       </section>
 
       <section class="panel">
@@ -126,8 +132,9 @@
 
       <section class="panel">
         <h2>Display</h2>
-        <label class="check"><input id="showStimulus" type="checkbox" checked> Show active stimulus AOI</label>
+        <label class="check"><input id="showStimulus" type="checkbox" checked> Show active stimulus AOI outline</label>
         <label class="check"><input id="showHeatmap" type="checkbox"> Show cumulative heatmap</label>
+        <div class="heatmap-key" aria-label="Heatmap density key"><span>Low</span><i></i><span>High</span></div>
         <label class="check"><input id="showTrail" type="checkbox" checked> Show recent gaze trail</label>
         <label class="check"><input id="showSurface" type="checkbox"> Show surface calibration</label>
         <label class="check"><input id="confidenceFilter" type="checkbox" checked> Hide low-confidence gaze</label>
@@ -147,6 +154,6 @@
 
   <footer class="site-footer" aria-hidden="true"></footer>
 
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>
