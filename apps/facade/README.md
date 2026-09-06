@@ -44,8 +44,12 @@ The cumulative heatmap now accumulates density in a floating-point field rather 
 - The original video uses its own native playback controls and is intentionally independent of the synchronized dashboard timeline.
 - If a participant video is not present, the panel shows the expected filename instead of breaking the dashboard.
 
-## v21 changes
+## v22 changes
 - Original participant reference videos now use `videos/PXX.mov` instead of MP4.
 - The original participant video is displayed on the same row as the main façade/gaze visualization so both can be viewed simultaneously.
 - The reference video remains independent and retains its own playback/seek controls.
 - Synchronization and Surface mapping remain in the lower administrative area.
+
+
+## v22 layout update
+The original participant MOV is now displayed as a compact 16:9 reference card in the right sidebar beneath Current state. The main façade visualization again uses the full left-column width.
