@@ -44,12 +44,27 @@ The cumulative heatmap now accumulates density in a floating-point field rather 
 - The original video uses its own native playback controls and is intentionally independent of the synchronized dashboard timeline.
 - If a participant video is not present, the panel shows the expected filename instead of breaking the dashboard.
 
-## v22 changes
+## v23 changes
 - Original participant reference videos now use `videos/PXX.mov` instead of MP4.
 - The original participant video is displayed on the same row as the main façade/gaze visualization so both can be viewed simultaneously.
 - The reference video remains independent and retains its own playback/seek controls.
 - Synchronization and Surface mapping remain in the lower administrative area.
 
 
-## v22 layout update
+## v23 layout update
 The original participant MOV is now displayed as a compact 16:9 reference card in the right sidebar beneath Current state. The main façade visualization again uses the full left-column width.
+
+
+## v23
+- Original participant video moved above Display in the sidebar.
+- Browser-overlay video controls replaced with independent controls below the video so the full image stays visible while scrubbing.
+
+
+## v24
+- Reorganized the dashboard into five analysis rows.
+- Timeline/playback card is sticky while scrolling.
+- Data view and original participant video are side-by-side.
+- Added timestamp-aligned affective time series for participant P12.
+- Added selectable affect channels and current synchronized affect values.
+- Added cumulative affective prominence matrix by stimulus zone.
+- Inactive affect values and -1 values are treated as missing.

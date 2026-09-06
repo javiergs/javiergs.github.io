@@ -11,11 +11,14 @@
   let markers = structuredClone(DEFAULT_MARKERS);
   const markerEls = {tl:$("markerTL"),tr:$("markerTR"),bl:$("markerBL"),br:$("markerBR")};
 
-  let gaze=[], fixations=[], stimuli={duration:259,events:[]};
+  let gaze=[], fixations=[], affect=[], stimuli={duration:259,events:[]};
   let recordingZero=0, recordingStartSec=0, recordingEndSec=0, sessionTime=0, playing=false, raf=0, lastAnimation=0;
   let sessionDuration=0;
   let currentGazeIndex=-1, currentParticipant="P12";
-  const PARTICIPANTS={P12:{gaze:"data/P12-gaze.csv",fixations:"data/P12-fixations.csv"},P03:{gaze:"data/P03-gaze.csv",fixations:"data/P03-fixations.csv"}};
+  const PARTICIPANTS={P12:{gaze:"data/P12-gaze.csv",fixations:"data/P12-fixations.csv",affect:"data/P12-affect.csv"},P03:{gaze:"data/P03-gaze.csv",fixations:"data/P03-fixations.csv",affect:null}};
+  const AFFECT_METRICS=["Focus","Engagement","Excitement","Interest","Relaxation","Stress"];
+  const AFFECT_COLORS={Focus:"#7655a6",Engagement:"#1f7a4c",Excitement:"#e08b22",Interest:"#2775a5",Relaxation:"#6b9f72",Stress:"#b64d4d"};
+  let affectRecordingZeroLocal=0;
   let gazeTimes=[];
   let eventPrefix=new Map();
   let syncRunToken=0;
@@ -47,6 +50,79 @@
     const {headers,rows}=parseCSV(text), idx=Object.fromEntries(headers.map((h,i)=>[h,i]));
     return rows.map(p=>({id:+p[idx.id],start:+p[idx.start_timestamp],durationMs:+p[idx.duration],confidence:+p[idx.confidence]}))
       .filter(r=>Number.isFinite(r.start)).sort((a,b)=>a.start-b.start);
+  }
+
+  function parseAffect(text){
+    const {headers,rows}=parseCSV(text), idx=Object.fromEntries(headers.map((h,i)=>[h,i]));
+    return rows.map(p=>{
+      const r={timestamp:+p[idx.Timestamp], localTime:(p[idx["Local time"]]||"").trim(), values:{}, active:{}};
+      for(const m of AFFECT_METRICS){
+        const activeRaw=(p[idx[`Active ${m}`]]||"").trim().toLowerCase();
+        const v=+p[idx[m]];
+        r.active[m]=activeRaw==="true";
+        r.values[m]=(r.active[m] && Number.isFinite(v) && v>=0) ? v : null;
+      }
+      return r;
+    }).filter(r=>Number.isFinite(r.timestamp)).sort((a,b)=>a.timestamp-b.timestamp);
+  }
+
+  function affectSec(r){return r.timestamp-affectRecordingZeroLocal;}
+  function nearestAffect(recSec){
+    if(!affect.length||!Number.isFinite(recSec))return null;
+    const target=affectRecordingZeroLocal+recSec;let lo=0,hi=affect.length-1;
+    while(lo<hi){const m=(lo+hi)>>1;if(affect[m].timestamp<target)lo=m+1;else hi=m;}
+    let r=affect[lo];
+    if(lo>0&&Math.abs(affect[lo-1].timestamp-target)<Math.abs(r.timestamp-target))r=affect[lo-1];
+    return Math.abs(r.timestamp-target)<=0.8?r:null;
+  }
+  function selectedAffectMetrics(){return [...document.querySelectorAll('#affectControls input[data-affect]:checked')].map(i=>i.dataset.affect);}
+  function renderAffectChart(){
+    const canvas=$("affectChart"); if(!canvas)return;
+    const rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1,w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));
+    if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
+    const ctx=canvas.getContext('2d');ctx.clearRect(0,0,w,h);ctx.save();ctx.scale(dpr,dpr);
+    const W=rect.width,H=rect.height,pad={l:42,r:14,t:14,b:28},pw=Math.max(1,W-pad.l-pad.r),ph=Math.max(1,H-pad.t-pad.b);
+    ctx.fillStyle='#fbfcfb';ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='#e3e8e5';ctx.lineWidth=1;ctx.fillStyle='#7a847e';ctx.font='10px system-ui';
+    for(let k=0;k<=4;k++){const y=pad.t+ph*(1-k/4);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.fillText((k/4).toFixed(2),5,y+3);}
+    const dur=Math.max(recordingEndSec,1);
+    const ticks=Math.min(6,Math.max(2,Math.floor(pw/120)));
+    for(let k=0;k<=ticks;k++){const sec=dur*k/ticks,x=pad.l+pw*k/ticks;ctx.strokeStyle='#eef1ef';ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,pad.t+ph);ctx.stroke();ctx.fillStyle='#7a847e';ctx.textAlign=k===0?'left':k===ticks?'right':'center';ctx.fillText(fmt(sec),x,pad.t+ph+17);}
+    const chosen=selectedAffectMetrics();
+    for(const m of chosen){
+      ctx.strokeStyle=AFFECT_COLORS[m];ctx.lineWidth=1.7;ctx.beginPath();let started=false;
+      for(const r of affect){const sec=affectSec(r);if(sec<0||sec>recordingEndSec)continue;const v=r.values[m];if(v==null){started=false;continue;}const x=pad.l+pw*(sec/dur),y=pad.t+ph*(1-clamp(v,0,1));if(!started){ctx.moveTo(x,y);started=true}else ctx.lineTo(x,y);}
+      ctx.stroke();
+    }
+    if(sessionTime>=0&&sessionTime<=recordingEndSec){const x=pad.l+pw*(sessionTime/dur);ctx.strokeStyle='#d6a500';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,pad.t+ph);ctx.stroke();}
+    ctx.restore();
+  }
+  function renderAffectCurrent(recSec){
+    const r=nearestAffect(recSec),box=$("affectNow"),state=$("currentAffect");
+    if(!r){if(box)box.textContent='No valid affective sample at this synchronized moment.';if(state)state.textContent='—';return;}
+    const vals=AFFECT_METRICS.filter(m=>r.values[m]!=null).map(m=>`${m} ${r.values[m].toFixed(3)}`);
+    if(box)box.textContent=vals.length?`${fmt(recSec)} · ${vals.join(' · ')}`:'Affective sample present, but all channels are inactive.';
+    if(state){const best=AFFECT_METRICS.filter(m=>r.values[m]!=null).sort((a,b)=>r.values[b]-r.values[a])[0];state.textContent=best?`${best} ${r.values[best].toFixed(3)}`:'—';}
+  }
+  function zoneAffectStats(event,cutoff){
+    const start=videoStartOnSession()+event.start,end=Math.min(videoStartOnSession()+event.end,cutoff);if(end<=start)return null;
+    const sums=Object.fromEntries(AFFECT_METRICS.map(m=>[m,0])),counts=Object.fromEntries(AFFECT_METRICS.map(m=>[m,0]));
+    for(const r of affect){const sec=affectSec(r);if(sec<start)continue;if(sec>end)break;for(const m of AFFECT_METRICS){const v=r.values[m];if(v!=null){sums[m]+=v;counts[m]++;}}}
+    const means={};for(const m of AFFECT_METRICS)means[m]=counts[m]?sums[m]/counts[m]:null;return means;
+  }
+  function renderAffectProminence(){
+    const box=$("affectProminence"),dom=$("dominantZones");if(!box||!dom)return;box.innerHTML='';dom.innerHTML='';
+    const corner=document.createElement('div');corner.className='prominence-cell prominence-label';corner.textContent='Measure';box.appendChild(corner);
+    stimuli.events.forEach((e,i)=>{const d=document.createElement('div');d.className='prominence-cell prominence-zone';d.textContent=`Z${i+1}`;d.title=e.label;box.appendChild(d)});
+    const stats=stimuli.events.map(e=>zoneAffectStats(e,sessionTime));
+    for(const m of AFFECT_METRICS){const lab=document.createElement('div');lab.className='prominence-cell prominence-label';lab.textContent=m;box.appendChild(lab);for(const st of stats){const v=st?.[m];const c=document.createElement('div');c.className='prominence-cell '+(v==null?'prominence-empty':'');if(v==null)c.textContent='—';else{const a=.08+.72*clamp(v,0,1);c.style.background=`rgba(25,62,44,${a.toFixed(3)})`;c.style.color=v>.48?'#fff':'#193e2c';c.textContent=v.toFixed(3);}box.appendChild(c);}}
+    stats.forEach((st,i)=>{const chip=document.createElement('div');chip.className='dominant-chip';if(!st){chip.innerHTML=`<strong>Z${i+1}</strong><span>not reached</span>`;}else{const valid=AFFECT_METRICS.filter(m=>st[m]!=null).sort((a,b)=>st[b]-st[a]);chip.innerHTML=valid.length?`<strong>Z${i+1} · ${valid[0]}</strong><span>${st[valid[0]].toFixed(3)}</span>`:`<strong>Z${i+1}</strong><span>no valid affect</span>`;}dom.appendChild(chip);});
+  }
+  function updateAffectAvailability(){
+    const statusEl=$("affectStatus"),coverage=$("affectCoverage");
+    const has=affect.length>0;if(statusEl){statusEl.className='quality '+(has?'good':'weak');statusEl.textContent=has?`${affect.length.toLocaleString()} samples`:'No file';}
+    if(coverage){if(!has)coverage.textContent='not available';else{const inStart=Math.max(0,affectSec(affect[0])),inEnd=Math.min(recordingEndSec,affectSec(affect.at(-1)));coverage.textContent=inEnd>inStart?`${fmt(inStart)}–${fmt(inEnd)}`:'outside gaze window';}}
+    for(const input of document.querySelectorAll('#affectControls input[data-affect]')){const m=input.dataset.affect,valid=affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec);input.disabled=!valid;if(!valid)input.checked=false;}
   }
 
   function solve(A,b){
@@ -321,6 +397,9 @@
     }
     const f=hasRecording?currentFixation(recTime):null;$("fixationId").textContent=f?`#${f.id} · ${Math.round(f.durationMs)} ms`:"—";
     renderHeatmap(sessionTime);
+    renderAffectChart();
+    renderAffectCurrent(hasRecording?recTime:NaN);
+    renderAffectProminence();
     updateCoverage();
   }
 
@@ -489,8 +568,31 @@
     const data={participant:currentParticipant,syncOffsetSeconds:+syncOffsetInput.value,surfaceMarkersPercent:markers,stimulusFile:"data/stimuli.json",note:"Offset is recording time minus stimulus-video time; the dashboard timeline spans all synchronized recording and stimulus data."};
     const a=document.createElement("a"),blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});a.href=URL.createObjectURL(blob);a.download=`${currentParticipant}-sync-config.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
   });
-  window.addEventListener("resize",()=>renderHeatmap(sessionTime));
+  window.addEventListener("resize",()=>{renderHeatmap(sessionTime);renderAffectChart();});
+  document.querySelectorAll('#affectControls input[data-affect]').forEach(el=>el.addEventListener('change',()=>{renderAffectChart();renderAffectProminence();}));
 
+
+  function formatVideoClock(sec){
+    if(!Number.isFinite(sec) || sec < 0) sec=0;
+    const total=Math.floor(sec), m=Math.floor(total/60), ss=String(total%60).padStart(2,"0");
+    return `${String(m).padStart(2,"0")}:${ss}`;
+  }
+
+  function bindParticipantVideoControls(){
+    const video=$("participantVideo"), playBtn=$("participantVideoPlay"), seek=$("participantVideoSeek"), time=$("participantVideoTime");
+    if(!video || !playBtn || !seek || !time) return;
+    const refresh=()=>{
+      const d=Number.isFinite(video.duration)?video.duration:0, c=Number.isFinite(video.currentTime)?video.currentTime:0;
+      if(d>0) seek.value=String(Math.round((c/d)*1000));
+      time.textContent=`${formatVideoClock(c)} / ${formatVideoClock(d)}`;
+      playBtn.textContent=video.paused?"▶":"❚❚";
+      playBtn.setAttribute("aria-label",video.paused?"Play participant video":"Pause participant video");
+    };
+    playBtn.addEventListener("click",()=>video.paused?video.play().catch(()=>{}):video.pause());
+    seek.addEventListener("input",()=>{if(Number.isFinite(video.duration)&&video.duration>0) video.currentTime=(+seek.value/1000)*video.duration;});
+    ["loadedmetadata","durationchange","timeupdate","play","pause","ended","seeking","seeked"].forEach(ev=>video.addEventListener(ev,refresh));
+    refresh();
+  }
 
   function updateParticipantVideo(id){
     const video=$("participantVideo");
@@ -506,6 +608,10 @@
       missing.innerHTML=`Add <strong>${filename}</strong> to the <code>videos</code> folder to view the original recording.`;
     }
     video.pause();
+    video.currentTime=0;
+    const seek=$("participantVideoSeek"); if(seek) seek.value="0";
+    const playBtn=$("participantVideoPlay"); if(playBtn) playBtn.textContent="▶";
+    const time=$("participantVideoTime"); if(time) time.textContent="00:00 / 00:00";
     source.src=src;
     source.type="video/quicktime";
     const showMissing=()=>{ if(missing) missing.hidden=false; };
@@ -521,16 +627,22 @@
     stop(); syncRunToken++; currentParticipant=id; status.textContent=`Loading ${id}…`;
     const cfg=PARTICIPANTS[id]; if(!cfg){status.textContent=`No data configured for ${id}`;return;}
     try{
-      const [g,f]=await Promise.all([fetch(cfg.gaze).then(r=>{if(!r.ok)throw Error(cfg.gaze);return r.text()}),fetch(cfg.fixations).then(r=>{if(!r.ok)throw Error(cfg.fixations);return r.text()})]);
-      gaze=parseGaze(g);fixations=parseFixations(f);
-      // Gaze is the primary coverage stream. Fixations are behavioral events layered on it.
+      const [g,f,a]=await Promise.all([
+        fetch(cfg.gaze).then(r=>{if(!r.ok)throw Error(cfg.gaze);return r.text()}),
+        fetch(cfg.fixations).then(r=>{if(!r.ok)throw Error(cfg.fixations);return r.text()}),
+        cfg.affect?fetch(cfg.affect).then(r=>r.ok?r.text():"").catch(()=>""):Promise.resolve("")
+      ]);
+      gaze=parseGaze(g);fixations=parseFixations(f);affect=a?parseAffect(a):[];
+      // Gaze is the primary coverage stream. Affect is aligned using the same local/Unix timestamp clock.
       recordingZero=gaze.length?gaze[0].deviceTimestamp:(fixations.length?fixations[0].start:0);
+      affectRecordingZeroLocal=gaze.length?gaze[0].localTimestamp:0;
       recordingStartSec=0;
       recordingEndSec=gaze.length?gaze[gaze.length-1].deviceTimestamp-recordingZero:0;
       sessionTime=0; syncOffsetInput.value="0.00";
       buildSyncIndex();
+      updateAffectAvailability();
       renderStimulusTrack();renderAt(0);updateQuality();updateCoverage();
-      status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · gaze coverage <strong>${fmt(recordingEndSec)}</strong>`;
+      status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · gaze coverage <strong>${fmt(recordingEndSec)}</strong>${affect.length?` · ${affect.length.toLocaleString()} affect samples`:''}`;
       if(auto)setTimeout(()=>{ if(currentParticipant===id) autoSync(); },120);
     }catch(err){console.error(err);status.textContent=`Could not load ${id} participant data`;}
   }
@@ -539,6 +651,7 @@
   fetch("data/stimuli.json").then(r=>r.json()).then(s=>{
     stimuli=s;
     $("participant").addEventListener("change",e=>loadParticipant(e.target.value,true));
+  bindParticipantVideoControls();
     return loadParticipant($("participant").value,true);
   }).catch(err=>{console.error(err);status.textContent="Could not load stimulus configuration";});
 })();

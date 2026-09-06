@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Heart Castle Facade Study Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=22">
+  <link rel="stylesheet" href="style.css?v=24">
 </head>
 <body>
   <header class="site-header">
@@ -18,79 +18,58 @@
     </div>
   </header>
 
-  <main class="layout">
-    <section class="viewer-card">
-      <div class="viewer-toolbar">
-        <div class="toolbar-group">
-          <label>Participant
-            <select id="participant"><option value="P12" selected>P12</option><option value="P03">P03</option></select>
-          </label>
-          <label>Facade view
-            <select id="facadeView">
-              <option value="stimulus" selected>Actual stimulus</option>
-              <option value="analysis">Analysis (desaturated)</option>
-            </select>
-          </label>
-          <label>Gaze display
-            <select id="overlayMode">
-              <option value="gaze" selected>Gaze point + trail</option>
-              <option value="stimulus">Stimulus only</option>
-            </select>
-          </label>
-        </div>
-        <div class="toolbar-actions">
-          <button id="resetSurface" type="button">Reset surface</button>
-          <button id="exportConfig" type="button">Export config</button>
-        </div>
-      </div>
-
-      <div class="timeline-area">
-        <div class="timeline-controls">
-          <button id="playPause" class="play" type="button" aria-label="Play or pause">▶</button>
-          <label>Speed
-            <select id="speed">
-              <option value="0.25">0.25×</option>
-              <option value="0.5">0.5×</option>
-              <option value="1" selected>1×</option>
-              <option value="2">2×</option>
-              <option value="4">4×</option>
-            </select>
-          </label>
-          <span class="study-window-note">Numbered blocks = recognized stimuli · gray = wait / baseline · hover for details.</span>
-        </div>
-        <div class="timeline-grid">
-          <div class="track-label">Timeline</div>
-          <div class="slider-track-cell">
-            <input id="timeSlider" type="range" min="0" max="2050" value="0" step="1" aria-label="Synchronized recording and stimulus timeline">
-            <div class="time-row"><span><strong id="sessionTime">00:00.0</strong></span><span id="durationLabel">—</span></div>
-            <div id="timelineCursorSlider" class="timeline-cursor slider-cursor" aria-hidden="true"></div>
+  <main class="dashboard-shell">
+    <section class="dashboard-row top-row">
+      <section class="viewer-card timeline-card">
+        <div class="viewer-toolbar">
+          <div class="toolbar-group">
+            <label>Participant
+              <select id="participant"><option value="P12" selected>P12</option><option value="P03">P03</option></select>
+            </label>
+            <label>Facade view
+              <select id="facadeView">
+                <option value="stimulus" selected>Actual stimulus</option>
+                <option value="analysis">Analysis (desaturated)</option>
+              </select>
+            </label>
+            <label>Gaze display
+              <select id="overlayMode">
+                <option value="gaze" selected>Gaze point + trail</option>
+                <option value="stimulus">Stimulus only</option>
+              </select>
+            </label>
           </div>
-          <div class="track-label">Stimulus video</div>
-          <div id="stimulusTrack" class="stimulus-track" aria-label="Full 4 minute 19 second stimulus video and recognized events"><div id="timelineCursorStimulus" class="timeline-cursor" aria-hidden="true"></div></div>
-          <div class="track-label">Participant data</div>
-          <div id="coverageTrack" class="coverage-track"><div id="participantCoverage" class="participant-coverage"></div><div id="timelineCursorCoverage" class="timeline-cursor" aria-hidden="true"></div></div>
+          <div class="toolbar-actions">
+            <button id="resetSurface" type="button">Reset surface</button>
+            <button id="exportConfig" type="button">Export config</button>
+          </div>
         </div>
-      </div>
 
-      <div class="stage-wrap">
-        <div id="stage" class="stage" aria-label="Façade stimulus with gaze and stimulus overlays">
-          <img id="facade" src="assets/stimulus/baseline.jpg" alt="Façade stimulus state">
-          <canvas id="heatmap" aria-hidden="true"></canvas>
-          <div class="surface-outline" id="surfaceOutline" aria-hidden="true"></div>
-
-          <button class="marker" id="markerTL" data-marker="tl" aria-label="Top-left surface point">TL</button>
-          <button class="marker" id="markerTR" data-marker="tr" aria-label="Top-right surface point">TR</button>
-          <button class="marker" id="markerBL" data-marker="bl" aria-label="Bottom-left surface point">BL</button>
-          <button class="marker" id="markerBR" data-marker="br" aria-label="Bottom-right surface point">BR</button>
-
-          <div id="gazeTrail" class="gaze-trail" aria-hidden="true"></div>
-          <div id="gazePoint" class="gaze-point" aria-label="Current gaze point"></div>
-          <div id="stimulusBadge" class="stimulus-badge">No active stimulus</div>
+        <div class="timeline-area">
+          <div class="timeline-controls">
+            <button id="playPause" class="play" type="button" aria-label="Play or pause">▶</button>
+            <label>Speed
+              <select id="speed">
+                <option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
+              </select>
+            </label>
+            <span class="study-window-note">Numbered blocks = recognized stimuli · gray = wait / baseline.</span>
+          </div>
+          <div class="timeline-grid">
+            <div class="track-label">Timeline</div>
+            <div class="slider-track-cell">
+              <input id="timeSlider" type="range" min="0" max="2050" value="0" step="1" aria-label="Synchronized recording and stimulus timeline">
+              <div class="time-row"><span><strong id="sessionTime">00:00.0</strong></span><span id="durationLabel">—</span></div>
+              <div id="timelineCursorSlider" class="timeline-cursor slider-cursor" aria-hidden="true"></div>
+            </div>
+            <div class="track-label">Stimulus video</div>
+            <div id="stimulusTrack" class="stimulus-track"><div id="timelineCursorStimulus" class="timeline-cursor" aria-hidden="true"></div></div>
+            <div class="track-label">Participant data</div>
+            <div id="coverageTrack" class="coverage-track"><div id="participantCoverage" class="participant-coverage"></div><div id="timelineCursorCoverage" class="timeline-cursor" aria-hidden="true"></div></div>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <aside class="side">
       <section class="panel recording-panel">
         <h2>Participant &amp; Recording</h2>
         <div id="status" class="recording-summary">Loading participant data…</div>
@@ -99,92 +78,67 @@
           <div><span>Participant</span><strong id="participantWindow">—</strong></div>
           <div><span>Video placed</span><strong id="videoWindow">—</strong></div>
           <div><span>Outside stimulus</span><strong id="outsideStimulus">—</strong></div>
+          <div><span>Affective data</span><strong id="affectCoverage">—</strong></div>
         </div>
         <span id="coverageText" class="sr-only">—</span>
       </section>
+    </section>
 
-      <section class="panel">
-        <h2>Display</h2>
-        <label class="check"><input id="showHeatmap" type="checkbox" checked> Show cumulative heatmap</label>
-        <div class="heatmap-key" aria-label="Heatmap density key"><span>Low</span><i></i><span>High</span></div>
-        <label class="check"><input id="showTrail" type="checkbox" checked> Show recent gaze trail</label>
-        <label class="check"><input id="showSurface" type="checkbox"> Show surface calibration</label>
-        <label class="check"><input id="confidenceFilter" type="checkbox" checked> Hide low-confidence gaze</label>
-        <label class="field">Minimum confidence
-          <input id="minConfidence" type="number" value="0.60" min="0" max="1" step="0.05">
-        </label>
-      </section>
-
-      <section class="panel">
-        <h2>Current state</h2>
-        <dl class="stats">
-          <div><dt>Stimulus</dt><dd id="activeStimulus">None</dd></div>
-          <div><dt>Gaze X</dt><dd id="sx">—</dd></div>
-          <div><dt>Gaze Y</dt><dd id="sy">—</dd></div>
-          <div><dt>Confidence</dt><dd id="confidence">—</dd></div>
-          <div><dt>Fixation</dt><dd id="fixationId">—</dd></div>
-          <div><dt>Sample</dt><dd id="sampleIndex">—</dd></div>
-        </dl>
-      </section>
-
-      <section class="panel participant-video-sidebar" aria-label="Original participant video">
-        <div class="participant-video-card-head">
-          <div>
-            <h2>Original participant video</h2>
-            <p>Independent reference</p>
-          </div>
-          <span id="participantVideoName" class="video-file-name">P12.mov</span>
-        </div>
-        <div class="participant-video-wrap sidebar-video-wrap">
-          <video id="participantVideo" controls preload="metadata" playsinline>
-            <source id="participantVideoSource" src="videos/P12.mov" type="video/quicktime">
-            Your browser does not support HTML video.
-          </video>
-          <div id="participantVideoMissing" class="video-missing" hidden>
-            Add <strong>P12.mov</strong> to the <code>videos</code> folder to view the original recording.
+    <section class="dashboard-row visual-compare">
+      <section class="viewer-card data-view-card">
+        <div class="section-title-row"><div><h2>Data view</h2><p>Stimulus, gaze, trail, and cumulative gaze density</p></div></div>
+        <div class="stage-wrap">
+          <div id="stage" class="stage" aria-label="Façade stimulus with gaze and stimulus overlays">
+            <img id="facade" src="assets/stimulus/baseline.jpg" alt="Façade stimulus state">
+            <canvas id="heatmap" aria-hidden="true"></canvas>
+            <div class="surface-outline" id="surfaceOutline" aria-hidden="true"></div>
+            <button class="marker" id="markerTL" data-marker="tl">TL</button><button class="marker" id="markerTR" data-marker="tr">TR</button><button class="marker" id="markerBL" data-marker="bl">BL</button><button class="marker" id="markerBR" data-marker="br">BR</button>
+            <div id="gazeTrail" class="gaze-trail" aria-hidden="true"></div><div id="gazePoint" class="gaze-point"></div><div id="stimulusBadge" class="stimulus-badge">No active stimulus</div>
           </div>
         </div>
       </section>
 
+      <section class="panel participant-video-panel" aria-label="Original participant video">
+        <div class="participant-video-card-head"><div><h2>Original participant video</h2><p>Independent reference</p></div><span id="participantVideoName" class="video-file-name">P12.mov</span></div>
+        <div class="participant-video-wrap compare-video-wrap"><video id="participantVideo" preload="metadata" playsinline><source id="participantVideoSource" src="videos/P12.mov" type="video/quicktime">Your browser does not support HTML video.</video><div id="participantVideoMissing" class="video-missing" hidden>Add <strong>P12.mov</strong> to the <code>videos</code> folder to view the original recording.</div></div>
+        <div class="participant-video-controls"><button id="participantVideoPlay" type="button" class="video-play">▶</button><input id="participantVideoSeek" type="range" min="0" max="1000" value="0" step="1"><span id="participantVideoTime" class="video-time">00:00 / 00:00</span></div>
+      </section>
+    </section>
 
-    </aside>
+    <section class="panel affect-panel">
+      <div class="section-title-row">
+        <div><h2>Affective data</h2><p>Synchronized by the participant recording timestamp. Invalid/inactive values are treated as missing.</p></div>
+        <span id="affectStatus" class="quality">Loading</span>
+      </div>
+      <div class="affect-controls" id="affectControls">
+        <label><input type="checkbox" data-affect="Focus"> Focus</label>
+        <label><input type="checkbox" data-affect="Engagement" checked> Engagement</label>
+        <label><input type="checkbox" data-affect="Excitement" checked> Excitement</label>
+        <label><input type="checkbox" data-affect="Interest" checked> Interest</label>
+        <label><input type="checkbox" data-affect="Relaxation" checked> Relaxation</label>
+        <label><input type="checkbox" data-affect="Stress" checked> Stress</label>
+      </div>
+      <div class="affect-chart-wrap"><canvas id="affectChart" aria-label="Synchronized affective time series"></canvas></div>
+      <div class="affect-now" id="affectNow">Move the synchronized timeline to inspect affective values.</div>
+
+      <div class="prominence-heading"><div><h3>Affective prominence by stimulus zone</h3><p>Cumulative through the current synchronized cursor. Cell intensity represents the mean valid value observed in each zone.</p></div><span class="muted small">0 → 1</span></div>
+      <div class="prominence-wrap"><div id="affectProminence" class="prominence-matrix"></div></div>
+      <div id="dominantZones" class="dominant-zones"></div>
+    </section>
+
+    <section class="dashboard-row controls-row">
+      <section class="panel"><h2>Display</h2><label class="check"><input id="showHeatmap" type="checkbox" checked> Show cumulative heatmap</label><div class="heatmap-key"><span>Low</span><i></i><span>High</span></div><label class="check"><input id="showTrail" type="checkbox" checked> Show recent gaze trail</label><label class="check"><input id="showSurface" type="checkbox"> Show surface calibration</label><label class="check"><input id="confidenceFilter" type="checkbox" checked> Hide low-confidence gaze</label><label class="field">Minimum confidence<input id="minConfidence" type="number" value="0.60" min="0" max="1" step="0.05"></label></section>
+      <section class="panel"><h2>Current state</h2><dl class="stats"><div><dt>Stimulus</dt><dd id="activeStimulus">None</dd></div><div><dt>Gaze X</dt><dd id="sx">—</dd></div><div><dt>Gaze Y</dt><dd id="sy">—</dd></div><div><dt>Confidence</dt><dd id="confidence">—</dd></div><div><dt>Fixation</dt><dd id="fixationId">—</dd></div><div><dt>Sample</dt><dd id="sampleIndex">—</dd></div><div><dt>Affect</dt><dd id="currentAffect">—</dd></div></dl></section>
+    </section>
+
+    <section class="dashboard-row admin-row">
+      <section class="panel sync-panel admin-panel"><div class="panel-heading"><h2>Synchronization</h2><span id="syncQuality" class="quality">Not scored</span></div><p class="muted small">Offset = recording time − stimulus-video time.</p><label class="field">Recording offset (s)<input id="syncOffset" type="number" value="0.00" step="0.01"></label><div class="nudge-row"><button data-nudge="-1">−1 s</button><button data-nudge="-0.1">−0.1</button><button data-nudge="0.1">+0.1</button><button data-nudge="1">+1 s</button></div><button id="autoSync" class="primary" type="button">Auto-sync from stimulus zones</button><div class="sync-readout"><span>Video <strong id="syncStimulusTime">—</strong></span><span>Recording <strong id="recordingTime">—</strong></span></div><p id="syncMessage" class="muted small">Auto-sync tests fixation responses against all eight known stimulus zones.</p></section>
+      <section class="panel admin-panel"><h2>Surface mapping</h2><p class="muted small">The four points map normalized Pupil Surface coordinates onto the canonical façade.</p><div id="markerInputs" class="marker-inputs"></div></section>
+    </section>
   </main>
-
-  <section class="lower-workspace admin-only">
-    <div class="admin-stack">
-      <section class="panel sync-panel admin-panel">
-        <div class="panel-heading">
-          <h2>Synchronization</h2>
-          <span id="syncQuality" class="quality">Not scored</span>
-        </div>
-        <p class="muted small">The slider spans the complete synchronized session. Offset = recording time − stimulus-video time.</p>
-        <label class="field">Recording offset (s)
-          <input id="syncOffset" type="number" value="0.00" step="0.01">
-        </label>
-        <div class="nudge-row">
-          <button data-nudge="-1">−1 s</button>
-          <button data-nudge="-0.1">−0.1</button>
-          <button data-nudge="0.1">+0.1</button>
-          <button data-nudge="1">+1 s</button>
-        </div>
-        <button id="autoSync" class="primary" type="button">Auto-sync from stimulus zones</button>
-        <div class="sync-readout">
-          <span>Video <strong id="syncStimulusTime">—</strong></span>
-          <span>Recording <strong id="recordingTime">—</strong></span>
-        </div>
-        <p id="syncMessage" class="muted small">Auto-sync tests fixation responses against all eight known stimulus zones. Door opening is preferred when available; other zones can anchor the alignment when the door response is missing.</p>
-      </section>
-
-      <section class="panel admin-panel">
-        <h2>Surface mapping</h2>
-        <p class="muted small">The four points map normalized Pupil Surface coordinates onto the canonical façade. Drag only if the gaze overlay needs registration correction.</p>
-        <div id="markerInputs" class="marker-inputs"></div>
-      </section>
-    </div>
-  </section>
 
   <footer class="site-footer" aria-hidden="true"></footer>
 
-  <script src="app.js?v=22"></script>
+  <script src="app.js?v=24"></script>
 </body>
 </html>
