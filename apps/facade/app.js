@@ -18,7 +18,7 @@
   let currentGazeIndex=-1, currentParticipant="P12";
   const PARTICIPANTS={P12:{gaze:"data/P12/gaze.csv",fixations:"data/P12/fixations.csv",affect:"data/P12/affect.txt"},P03:{gaze:"data/P03/gaze.csv",fixations:"data/P03/fixations.csv",affect:"data/P03/affect.txt"}};
   const AFFECT_METRICS=["Focus","Engagement","Excitement","Interest","Relaxation","Stress"];
-  const AFFECT_COLORS={Focus:"#7655a6",Engagement:"#1f7a4c",Excitement:"#e08b22",Interest:"#2775a5",Relaxation:"#6b9f72",Stress:"#b64d4d"};
+  const AFFECT_COLORS={Focus:"#7B2CBF",Engagement:"#009E73",Excitement:"#E69F00",Interest:"#0072B2",Relaxation:"#CC79A7",Stress:"#D55E00"};
   let affectRecordingZeroLocal=0;
   let gazeTimes=[];
   let eventPrefix=new Map();
@@ -77,6 +77,10 @@
     return Math.abs(r.timestamp-target)<=0.8?r:null;
   }
   function selectedAffectMetrics(){return [...document.querySelectorAll('#affectControls input[data-affect]:checked')].map(i=>i.dataset.affect);}
+  function selectedAffectHeatMetric(){
+    const picked=document.querySelector('input[name="affectHeatMetric"]:checked');
+    return picked?.value || "Engagement";
+  }
   function renderAffectChart(){
     const canvas=$("affectChart"); if(!canvas)return;
     const rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1,w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));
@@ -135,36 +139,75 @@
     });
   }
   function hexToRgb(hex){const h=hex.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+  function affectTone(metric,value){
+    const base=hexToRgb(AFFECT_COLORS[metric]||"#009E73"),v=clamp(value,0,1);
+    // Hue identifies the affective measure. Tone/saturation and alpha encode its 0–1 value.
+    // At 0 the mark is effectively absent; at 1 the measure reaches its full canonical color.
+    const tone=Math.pow(v,.82);
+    const rgb=base.map(c=>Math.round(255+(c-255)*tone));
+    return {rgb,alpha:.92*Math.pow(v,.90)};
+  }
   function renderAffectHeatmap(){
     if(!affectHeatmap||!affectHeatCtx)return;
     const rect=affectHeatmap.getBoundingClientRect(),dpr=window.devicePixelRatio||1,w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));
     if(affectHeatmap.width!==w||affectHeatmap.height!==h){affectHeatmap.width=w;affectHeatmap.height=h;}
     affectHeatCtx.clearRect(0,0,w,h);
-    if(!showAffectHeatmap?.checked || !affect.length)return;
-    affectHeatCtx.save();affectHeatCtx.scale(dpr,dpr);
-    const W=rect.width,H=rect.height;
-    for(const e of stimuli.events){
-      const st=zoneAffectStats(e,sessionTime),top=dominantAffect(st);if(!top)continue;
-      const [r,g,b]=hexToRgb(AFFECT_COLORS[top.metric]);
-      const alpha=.10+.38*clamp(top.value,0,1);
-      affectHeatCtx.fillStyle=`rgba(${r},${g},${b},${alpha.toFixed(3)})`;
-      affectHeatCtx.strokeStyle=`rgba(${r},${g},${b},${Math.min(.85,alpha+.28).toFixed(3)})`;
-      affectHeatCtx.lineWidth=1.5;
-      affectHeatCtx.shadowColor=`rgba(${r},${g},${b},.55)`;affectHeatCtx.shadowBlur=18;
-      for(const sh of (e.shapes||[])){
-        affectHeatCtx.beginPath();
-        if(sh.type==='rect')affectHeatCtx.rect(W*sh.x/100,H*sh.y/100,W*sh.w/100,H*sh.h/100);
-        else if(sh.type==='ellipse')affectHeatCtx.ellipse(W*sh.cx/100,H*sh.cy/100,W*sh.rx/100,H*sh.ry/100,0,0,Math.PI*2);
-        affectHeatCtx.fill();affectHeatCtx.shadowBlur=0;affectHeatCtx.stroke();affectHeatCtx.shadowBlur=18;
+    affectHeatmap.style.display=showAffectHeatmap?.checked?"block":"none";
+    if(!showAffectHeatmap?.checked || !affect.length || !gaze.length)return;
+
+    const metric=selectedAffectHeatMetric();
+    const recEnd=Math.min(sessionTime,recordingEndSec);
+    if(recEnd<=recordingStartSec)return;
+
+    // Each pixel stores a kernel-weighted MEAN affect value, not a cumulative count.
+    // Therefore repeated viewing does not make a location "hotter" merely because more time passed.
+    // Gaze determines where evidence exists; the selected affect's 0–1 value determines tone/intensity.
+    const scale=.30, fw=Math.max(120,Math.round(w*scale)), fh=Math.max(80,Math.round(h*scale));
+    const weightedValue=new Float32Array(fw*fh), weightSum=new Float32Array(fw*fh);
+    const radius=Math.max(7,Math.round(fw*.016)),r2=radius*radius;
+    let i=nearestGazeIndex(recordingStartSec),sample=0;if(i<0)return;
+    while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>recordingStartSec)i--;
+    for(;i<gaze.length;i++){
+      const recSec=gaze[i].deviceTimestamp-recordingZero;if(recSec>recEnd)break;
+      const gr=gaze[i];if(recSec<recordingStartSec||!validGaze(gr))continue;
+      if(sample++%4)continue;
+      const ar=nearestAffect(recSec),value=ar?.values?.[metric];
+      if(value==null||value<=0)continue;
+      const p=mapSurface(gr.surfaceX,gr.surfaceY),cx=Math.round(p.x/100*(fw-1)),cy=Math.round(p.y/100*(fh-1));
+      const x0=Math.max(0,cx-radius),x1=Math.min(fw-1,cx+radius),y0=Math.max(0,cy-radius),y1=Math.min(fh-1,cy+radius);
+      for(let yy=y0;yy<=y1;yy++){
+        const dy=yy-cy;
+        for(let xx=x0;xx<=x1;xx++){
+          const dx=xx-cx,d2=dx*dx+dy*dy;if(d2>r2)continue;
+          const q=1-d2/r2,k=q*q,idx=yy*fw+xx;
+          weightedValue[idx]+=k*value;weightSum[idx]+=k;
+        }
       }
     }
-    affectHeatCtx.restore();
+
+    const out=new ImageData(fw,fh);
+    for(let idx=0;idx<weightSum.length;idx++){
+      const support=weightSum[idx];if(support<=.025)continue;
+      const value=clamp(weightedValue[idx]/support,0,1);
+      if(value<=.01)continue;
+      const {rgb,alpha}=affectTone(metric,value);
+      // support only softens the very edge of each gaze kernel; it saturates quickly and
+      // does not serve as the heat value. The selected affect remains the intensity encoding.
+      const supportMask=clamp(support/.18,0,1);
+      const k=idx*4;out.data[k]=rgb[0];out.data[k+1]=rgb[1];out.data[k+2]=rgb[2];out.data[k+3]=Math.round(255*alpha*supportMask);
+    }
+    const colored=document.createElement('canvas');colored.width=fw;colored.height=fh;colored.getContext('2d').putImageData(out,0,0);
+    affectHeatCtx.imageSmoothingEnabled=true;affectHeatCtx.drawImage(colored,0,0,w,h);
   }
   function updateAffectAvailability(){
     const statusEl=$("affectStatus"),coverage=$("affectCoverage");
     const has=affect.length>0;if(statusEl){statusEl.className='quality '+(has?'good':'weak');statusEl.textContent=has?`${affect.length.toLocaleString()} samples`:'No file';}
     if(coverage){if(!has)coverage.textContent='not available';else{const inStart=Math.max(0,affectSec(affect[0])),inEnd=Math.min(recordingEndSec,affectSec(affect.at(-1)));coverage.textContent=inEnd>inStart?`${fmt(inStart)}–${fmt(inEnd)}`:'outside gaze window';}}
     for(const input of document.querySelectorAll('#affectControls input[data-affect]')){const m=input.dataset.affect,valid=affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec);input.disabled=!valid;if(!valid)input.checked=false;}
+    const heatRadios=[...document.querySelectorAll('input[name="affectHeatMetric"]')];
+    for(const input of heatRadios){const m=input.value,valid=affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec);input.disabled=!valid;}
+    const chosen=heatRadios.find(i=>i.checked&&!i.disabled);
+    if(!chosen){const fallback=heatRadios.find(i=>!i.disabled);if(fallback)fallback.checked=true;}
   }
 
   function solve(A,b){
@@ -613,6 +656,11 @@
   });
   window.addEventListener("resize",()=>{renderHeatmap(sessionTime);renderAffectChart();renderAffectHeatmap();});
   document.querySelectorAll('#affectControls input[data-affect]').forEach(el=>el.addEventListener('change',()=>{renderAffectChart();renderAffectProminence();renderAffectHeatmap();}));
+  document.querySelectorAll('input[name="affectHeatMetric"]').forEach(el=>el.addEventListener('change',()=>{renderAffectHeatmap();document.querySelectorAll('.affect-heatmap-picker label').forEach(l=>l.classList.toggle('selected',l.querySelector('input')?.checked));}));
+  if(showHeatmap&&showAffectHeatmap){
+    showHeatmap.addEventListener('change',()=>{if(showHeatmap.checked){showAffectHeatmap.checked=false;}renderAt(sessionTime);});
+    showAffectHeatmap.addEventListener('change',()=>{if(showAffectHeatmap.checked){showHeatmap.checked=false;}renderAt(sessionTime);});
+  }
 
 
   function formatVideoClock(sec){
