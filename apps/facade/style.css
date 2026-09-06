@@ -4,7 +4,9 @@
   --ink:#18211b;
   --muted:#667068;
   --line:#dce5e0;
-  --brand:#193e2c;
+  --brand:#384d42;
+  --brand-deep:#193e2c;
+  --brand-light:#c4d9d5;
   --brand-2:#7f9c8f;
   --gold:#f2c94c;
   --help:#ff7a00;
@@ -14,8 +16,14 @@
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 button,input,select{font:inherit}
 button{cursor:pointer}
-.topbar{background:var(--brand);color:white;padding:18px 24px;display:flex;justify-content:space-between;gap:24px;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.12)}
-.topbar h1{font-size:24px;margin:2px 0}.topbar p{margin:3px 0 0;opacity:.78}.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:11px;opacity:.72}.status{font-size:12px;opacity:.85;text-align:right}
+.site-header{background:var(--brand);color:white;padding:20px clamp(18px,4vw,54px);display:flex;gap:24px;align-items:center;justify-content:space-between;border-bottom:4px solid var(--brand-2)}
+.site-header .brand{width:min(1500px,100%);margin:0 auto}
+.brand{display:flex;align-items:center;gap:16px;min-width:0}
+.lab-logo{width:82px;height:82px;object-fit:contain;object-position:center;border-radius:7px;display:block;background:var(--brand-light);border:2px solid rgba(255,255,255,.35);box-shadow:0 2px 9px rgba(0,0,0,.17);flex:0 0 auto}
+.site-header h1{margin:0;color:#fff;font-size:clamp(1.6rem,3vw,2.45rem);letter-spacing:-.03em}
+.lab-name{margin-bottom:2px;color:rgba(255,255,255,.82);font-size:clamp(.72rem,1.15vw,.88rem);font-weight:750;letter-spacing:.055em}
+.subtitle{margin:4px 0 0;color:var(--brand-light);opacity:1}
+.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:11px;opacity:.72}.status{font-size:12px;opacity:.85;text-align:right}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;padding:18px;max-width:1600px;margin:auto}
 .viewer-card,.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.035)}
 .viewer-card{padding:14px}.viewer-toolbar{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:12px}.toolbar-group,.toolbar-actions{display:flex;gap:10px;align-items:end}.viewer-toolbar label,.playback label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
@@ -28,7 +36,9 @@ button{border:1px solid var(--line);border-radius:7px;background:#fff;padding:7p
 .gaze-point{position:absolute;z-index:8;width:18px;height:18px;border:3px solid #fff;border-radius:50%;background:rgba(217,48,37,.78);box-shadow:0 0 0 3px rgba(217,48,37,.25);transform:translate(-50%,-50%);pointer-events:none}.trail-dot{position:absolute;width:7px;height:7px;background:#fff;border:1px solid rgba(217,48,37,.9);border-radius:50%;transform:translate(-50%,-50%)}
 .stimulus-overlay .aoi{fill:rgba(242,201,76,.20);stroke:rgba(255,195,0,.98);stroke-width:.45;vector-effect:non-scaling-stroke}.stimulus-overlay .aoi-pulse{animation:pulse 1.3s ease-in-out infinite}@keyframes pulse{50%{fill:rgba(242,201,76,.34)}}
 .stimulus-badge{position:absolute;left:12px;top:12px;z-index:9;background:rgba(0,0,0,.68);color:white;padding:7px 10px;border-radius:7px;font-size:12px;backdrop-filter:blur(4px)}
-.stimulus-track{position:relative;height:46px;margin:10px 3px 0;border-radius:7px;background:#edf1ef;overflow:hidden}.stimulus-segment{position:absolute;top:6px;height:34px;border:0;border-radius:5px;background:rgba(127,156,143,.55);color:#183a2b;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 6px;text-align:left}.stimulus-segment:hover,.stimulus-segment.active{background:rgba(242,201,76,.72)}
+.study-window-summary{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:10px 3px 3px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:#fbfcfb;color:var(--muted);font-size:12px}.study-window-summary strong{color:var(--brand-deep)}.study-window-note{text-align:right}
+.stimulus-track{position:relative;height:46px;margin:4px 3px 0;border-radius:7px;background:linear-gradient(90deg,rgba(56,77,66,.06),rgba(127,156,143,.16),rgba(56,77,66,.06));overflow:hidden}.stimulus-track::before{content:"";position:absolute;top:0;bottom:0;left:0;width:100%;pointer-events:none}.stimulus-segment{position:absolute;top:6px;height:34px;border:0;border-radius:5px;background:rgba(127,156,143,.60);color:#183a2b;font-size:12px;font-weight:800;padding:0;text-align:center;display:flex;align-items:center;justify-content:center;min-width:16px}.stimulus-segment:hover,.stimulus-segment.active{background:rgba(242,201,76,.78)}
+.stimulus-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 14px;margin:7px 4px 0;color:var(--muted);font-size:11px}.stimulus-legend button{border:0;background:transparent;padding:2px 0;text-align:left;color:inherit}.stimulus-legend button:hover{background:transparent;color:var(--brand-deep)}.stimulus-legend strong{display:inline-block;min-width:20px;color:var(--brand-deep)}
 .playback{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;margin-top:10px}.play{width:42px;height:38px;font-size:16px}.time-stack{display:grid;gap:3px}.time-stack input{width:100%}.time-row{display:flex;justify-content:space-between;color:var(--muted);font-size:12px}
 .side{display:grid;gap:14px;align-content:start}.panel{padding:14px}.panel h2{font-size:15px;margin:0 0 10px}.panel-heading{display:flex;justify-content:space-between;gap:8px;align-items:center}.quality{font-size:11px;padding:3px 7px;border-radius:99px;background:#eef1ef;color:var(--muted)}.quality.good{background:#daf3df;color:#17602b}.quality.mid{background:#fff4cb;color:#755b00}.quality.weak{background:#fde1df;color:#8a211a}
 .field{display:grid;gap:5px;margin:9px 0}.check{display:block;margin:7px 0}.muted{color:var(--muted)}.small{font-size:12px}.note{border-left:4px solid var(--brand-2)}code{background:#eef2ef;padding:1px 4px;border-radius:4px}
@@ -36,14 +46,7 @@ button{border:1px solid var(--line);border-radius:7px;background:#fff;padding:7p
 .stats{display:grid;gap:0;margin:0}.stats div{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #eef1ef}.stats div:last-child{border:0}.stats dt{color:var(--muted)}.stats dd{margin:0;font-weight:600;text-align:right;max-width:190px}
 .marker-inputs{display:grid;gap:7px}.marker-row{display:grid;grid-template-columns:28px 1fr 1fr;gap:6px;align-items:end}.marker-row label{font-size:10px;color:var(--muted);display:grid;gap:2px}.marker-row input{width:100%;padding:5px 6px}
 @media(max-width:1000px){.layout{grid-template-columns:1fr}.side{grid-template-columns:repeat(2,minmax(0,1fr))}.stage-wrap{min-height:300px}}
-@media(max-width:650px){.topbar,.viewer-toolbar{align-items:flex-start;flex-direction:column}.layout{padding:10px}.side{grid-template-columns:1fr}.toolbar-group{flex-wrap:wrap}.playback{grid-template-columns:auto 1fr}.playback>label{grid-column:1/-1}.stage-wrap{min-height:220px}}
+@media(max-width:650px){.site-header,.viewer-toolbar{align-items:flex-start;flex-direction:column}.layout{padding:10px}.side{grid-template-columns:1fr}.toolbar-group{flex-wrap:wrap}.playback{grid-template-columns:auto 1fr}.playback>label{grid-column:1/-1}.stage-wrap{min-height:220px}}
 
-/* CALHCI study banner */
-.topbar{padding:28px clamp(24px,5vw,80px);border-bottom:5px solid #98b4aa;box-shadow:none}
-.brand-wrap{display:flex;align-items:center;gap:24px}
-.brand-logo{width:122px;height:122px;object-fit:contain;border-radius:10px;background:#dbe8e3}
-.lab-name{font-size:20px;font-weight:750;letter-spacing:.055em;color:rgba(255,255,255,.86);margin-bottom:4px}
-.topbar h1{font-size:48px;line-height:1.05;margin:4px 0 8px;letter-spacing:-.025em}
-.topbar p{font-size:22px;color:#c7d8d2;opacity:1;margin:0}
-.working-status{padding:3px 2px 12px;font-size:13px;font-weight:650;color:var(--brand);letter-spacing:.01em}
-@media(max-width:760px){.brand-logo{width:82px;height:82px}.topbar h1{font-size:30px}.lab-name{font-size:14px}.topbar p{font-size:16px}.topbar{padding:20px}.brand-wrap{gap:16px}}
+.working-status{padding:3px 2px 12px;font-size:13px;font-weight:650;color:var(--brand-deep);letter-spacing:.01em}
+@media(max-width:760px){.lab-logo{width:70px;height:70px}.site-header{padding:16px 12px}.brand{gap:14px}.study-window-summary{align-items:flex-start;flex-direction:column}.study-window-note{text-align:left}.stimulus-legend{grid-template-columns:1fr}}

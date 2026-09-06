@@ -105,8 +105,11 @@
     }
   }
   function renderStimulusTrack(){
-    const track=$("stimulusTrack");track.innerHTML="";
-    for(const e of stimuli.events){const b=document.createElement("button");b.className="stimulus-segment";b.dataset.id=e.id;b.title=`${e.label}: ${fmt(e.start)}–${fmt(e.end)}`;b.textContent=e.label;b.style.left=(e.start/stimuli.duration*100)+"%";b.style.width=((e.end-e.start)/stimuli.duration*100)+"%";b.addEventListener("click",()=>{stop();renderAt(e.start)});track.appendChild(b)}
+    const track=$("stimulusTrack"), legend=$("stimulusLegend");track.innerHTML="";legend.innerHTML="";
+    stimuli.events.forEach((e,idx)=>{
+      const n=idx+1,b=document.createElement("button");b.className="stimulus-segment";b.dataset.id=e.id;b.title=`${n}. ${e.label}: ${fmt(e.start)}–${fmt(e.end)}`;b.textContent=String(n);b.style.left=(e.start/stimuli.duration*100)+"%";b.style.width=((e.end-e.start)/stimuli.duration*100)+"%";b.addEventListener("click",()=>{stop();renderAt(e.start)});track.appendChild(b);
+      const k=document.createElement("button");k.innerHTML=`<strong>${n}.</strong> ${e.label}`;k.title=`Jump to ${fmt(e.start)}`;k.addEventListener("click",()=>{stop();renderAt(e.start)});legend.appendChild(k);
+    });
   }
 
   function nearestGazeIndex(recordingSec){
@@ -136,9 +139,11 @@
     const off=+syncOffsetInput.value||0;
     // Cumulative participant heatmap: deterministic at every slider position.
     // Going backward rebuilds only the gaze accumulated up to that time.
+    // Accumulate only gaze that belongs to the synchronized stimulus timeline.
+    // At stimulus 00:00 the heatmap is empty, regardless of recorder lead-in.
+    const recStart=off;
     const recEnd=t+off;
-    const recStart=0;
-    if(recEnd<=recStart) return;
+    if(t<=0 || recEnd<=recStart) return;
     let i=nearestGazeIndex(recStart);
     if(i<0)return;
     while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>recStart)i--;

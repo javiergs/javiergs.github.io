@@ -7,13 +7,13 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand-wrap">
-      <img class="brand-logo" src="assets/calhci-logo.png" alt="CALHCI logo">
+  <header class="site-header">
+    <div class="brand">
+      <img class="lab-logo" src="assets/calhci-logo.png" alt="CALHCI logo">
       <div>
         <div class="lab-name">Contextual Adaptation Lab | Human-Computer Interaction</div>
         <h1>Heart Castle Facade Study Dashboard</h1>
-        <p>Synchronized visual stimuli, gaze, and affective data</p>
+        <p class="subtitle">Synchronized visual stimuli, gaze, and affective data</p>
       </div>
     </div>
   </header>
@@ -58,8 +58,6 @@
         </div>
       </div>
 
-      <div id="stimulusTrack" class="stimulus-track" aria-label="Stimulus events"></div>
-
       <div class="playback">
         <button id="playPause" class="play" type="button">▶</button>
         <div class="time-stack">
@@ -79,6 +77,13 @@
           </select>
         </label>
       </div>
+
+      <div class="study-window-summary">
+        <span><strong>Study stimulus window</strong> · 03:25.0</span>
+        <span class="study-window-note">Areas before/after are extra source material</span>
+      </div>
+      <div id="stimulusTrack" class="stimulus-track" aria-label="Stimulus events"></div>
+      <div id="stimulusLegend" class="stimulus-legend" aria-label="Stimulus event legend"></div>
     </section>
 
     <aside class="side">
