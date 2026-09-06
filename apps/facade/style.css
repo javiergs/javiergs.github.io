@@ -37,3 +37,13 @@ button{border:1px solid var(--line);border-radius:7px;background:#fff;padding:7p
 .marker-inputs{display:grid;gap:7px}.marker-row{display:grid;grid-template-columns:28px 1fr 1fr;gap:6px;align-items:end}.marker-row label{font-size:10px;color:var(--muted);display:grid;gap:2px}.marker-row input{width:100%;padding:5px 6px}
 @media(max-width:1000px){.layout{grid-template-columns:1fr}.side{grid-template-columns:repeat(2,minmax(0,1fr))}.stage-wrap{min-height:300px}}
 @media(max-width:650px){.topbar,.viewer-toolbar{align-items:flex-start;flex-direction:column}.layout{padding:10px}.side{grid-template-columns:1fr}.toolbar-group{flex-wrap:wrap}.playback{grid-template-columns:auto 1fr}.playback>label{grid-column:1/-1}.stage-wrap{min-height:220px}}
+
+/* CALHCI study banner */
+.topbar{padding:28px clamp(24px,5vw,80px);border-bottom:5px solid #98b4aa;box-shadow:none}
+.brand-wrap{display:flex;align-items:center;gap:24px}
+.brand-logo{width:122px;height:122px;object-fit:contain;border-radius:10px;background:#dbe8e3}
+.lab-name{font-size:20px;font-weight:750;letter-spacing:.055em;color:rgba(255,255,255,.86);margin-bottom:4px}
+.topbar h1{font-size:48px;line-height:1.05;margin:4px 0 8px;letter-spacing:-.025em}
+.topbar p{font-size:22px;color:#c7d8d2;opacity:1;margin:0}
+.working-status{padding:3px 2px 12px;font-size:13px;font-weight:650;color:var(--brand);letter-spacing:.01em}
+@media(max-width:760px){.brand-logo{width:82px;height:82px}.topbar h1{font-size:30px}.lab-name{font-size:14px}.topbar p{font-size:16px}.topbar{padding:20px}.brand-wrap{gap:16px}}

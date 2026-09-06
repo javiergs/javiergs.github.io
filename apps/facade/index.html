@@ -3,31 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Stimulus-Synchronized Gaze Viewer</title>
+  <title>Heart Castle Facade Study Dashboard</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
-    <div>
-      <div class="eyebrow">CAL for HCI</div>
-      <h1>Stimulus-Synchronized Gaze Viewer</h1>
-      <p>Canonical façade + stimulus AOIs + participant response on one master stimulus clock.</p>
+    <div class="brand-wrap">
+      <img class="brand-logo" src="assets/calhci-logo.png" alt="CALHCI logo">
+      <div>
+        <div class="lab-name">Contextual Adaptation Lab | Human-Computer Interaction</div>
+        <h1>Heart Castle Facade Study Dashboard</h1>
+        <p>Synchronized visual stimuli, gaze, and affective data</p>
+      </div>
     </div>
-    <div class="status" id="status">Loading P03…</div>
   </header>
 
   <main class="layout">
     <section class="viewer-card">
+      <div id="status" class="working-status">Loading participant data…</div>
+
       <div class="viewer-toolbar">
         <div class="toolbar-group">
           <label>Participant
             <select id="participant"><option value="P03">P03</option></select>
           </label>
-          <label>Overlay
+          <label>Gaze display
             <select id="overlayMode">
               <option value="gaze" selected>Gaze point + trail</option>
-              <option value="heat-current">Heatmap · current stimulus</option>
-              <option value="heat-window">Heatmap · last 3 seconds</option>
               <option value="stimulus">Stimulus only</option>
             </select>
           </label>
@@ -118,6 +120,7 @@
       <section class="panel">
         <h2>Display</h2>
         <label class="check"><input id="showStimulus" type="checkbox" checked> Show active stimulus AOI</label>
+        <label class="check"><input id="showHeatmap" type="checkbox"> Show cumulative heatmap</label>
         <label class="check"><input id="showTrail" type="checkbox" checked> Show recent gaze trail</label>
         <label class="check"><input id="showSurface" type="checkbox"> Show surface calibration</label>
         <label class="check"><input id="confidenceFilter" type="checkbox" checked> Hide low-confidence gaze</label>
@@ -132,11 +135,6 @@
         <div id="markerInputs" class="marker-inputs"></div>
       </section>
 
-      <section class="panel note">
-        <h2>Analysis model</h2>
-        <p><strong>Stimulus video is not required during analysis.</strong> The dashboard reconstructs stimulus state from <code>stimuli.json</code> and keeps the exact façade image fixed.</p>
-        <p>Automatic synchronization searches for an offset where gaze enters the highlighted AOIs shortly after multiple stimulus onsets. The door is weighted more strongly, but it is not trusted alone.</p>
-      </section>
     </aside>
   </main>
 

@@ -3,7 +3,7 @@
   const stage = $("stage"), slider = $("timeSlider"), heatmap = $("heatmap"), heatCtx = heatmap.getContext("2d");
   const gazePoint = $("gazePoint"), gazeTrail = $("gazeTrail"), stimulusOverlay = $("stimulusOverlay"), outline = $("surfaceOutline");
   const status = $("status"), syncOffsetInput = $("syncOffset"), overlayMode = $("overlayMode");
-  const showTrail = $("showTrail"), showStimulus = $("showStimulus"), showSurface = $("showSurface"), confidenceFilter = $("confidenceFilter"), minConfidence = $("minConfidence");
+  const showTrail = $("showTrail"), showStimulus = $("showStimulus"), showHeatmap = $("showHeatmap"), showSurface = $("showSurface"), confidenceFilter = $("confidenceFilter"), minConfidence = $("minConfidence");
 
   const DEFAULT_MARKERS = {
     tl:{x:8.9,y:12.2}, tr:{x:89.3,y:12.2}, bl:{x:8.9,y:92.5}, br:{x:89.3,y:92.5}
@@ -131,11 +131,26 @@
     const x=xPct/100*heatmap.width,y=yPct/100*heatmap.height,r=Math.max(18,heatmap.width*.028),g=heatCtx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,`rgba(255,80,0,${alpha})`);g.addColorStop(.45,`rgba(255,180,0,${alpha*.7})`);g.addColorStop(1,"rgba(255,220,0,0)");heatCtx.fillStyle=g;heatCtx.fillRect(x-r,y-r,r*2,r*2);
   }
   function renderHeatmap(t){
-    ensureCanvas();clearHeatmap();const mode=overlayMode.value;if(!mode.startsWith("heat"))return;
-    const off=+syncOffsetInput.value||0;let a,b;
-    if(mode==="heat-current"){const e=activeEvent(t);if(!e)return;a=e.start;b=Math.min(t,e.end)}else{a=Math.max(0,t-3);b=t}
-    const ra=a+off,rb=b+off;let i=nearestGazeIndex(ra);if(i<0)return;while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>ra)i--;
-    let count=0;for(;i<gaze.length;i++){const rt=gaze[i].deviceTimestamp-recordingZero;if(rt>rb)break;if(rt<ra||!validGaze(gaze[i]))continue;if(count++%5)continue;const p=mapSurface(gaze[i].surfaceX,gaze[i].surfaceY);drawHeatPoint(p.x,p.y,.10)}
+    ensureCanvas(); clearHeatmap();
+    if(!showHeatmap.checked) return;
+    const off=+syncOffsetInput.value||0;
+    // Cumulative participant heatmap: deterministic at every slider position.
+    // Going backward rebuilds only the gaze accumulated up to that time.
+    const recEnd=t+off;
+    const recStart=0;
+    if(recEnd<=recStart) return;
+    let i=nearestGazeIndex(recStart);
+    if(i<0)return;
+    while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>recStart)i--;
+    let count=0;
+    for(;i<gaze.length;i++){
+      const rt=gaze[i].deviceTimestamp-recordingZero;
+      if(rt>recEnd)break;
+      if(rt<recStart||!validGaze(gaze[i]))continue;
+      if(count++%5)continue;
+      const p=mapSurface(gaze[i].surfaceX,gaze[i].surfaceY);
+      drawHeatPoint(p.x,p.y,.085);
+    }
   }
 
   function renderAt(t){
@@ -192,7 +207,7 @@
   syncOffsetInput.addEventListener("input",()=>{updateQuality();renderAt(stimulusTime)});
   $("autoSync").addEventListener("click",autoSync);
   document.querySelectorAll("[data-nudge]").forEach(b=>b.addEventListener("click",()=>{syncOffsetInput.value=(+syncOffsetInput.value + +b.dataset.nudge).toFixed(2);updateQuality();renderAt(stimulusTime)}));
-  [overlayMode,showTrail,showStimulus,showSurface,confidenceFilter,minConfidence].forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(stimulusTime)}));
+  [overlayMode,showTrail,showStimulus,showHeatmap,showSurface,confidenceFilter,minConfidence].forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(stimulusTime)}));
   Object.values(markerEls).forEach(el=>el.addEventListener("pointerdown",e=>beginDrag(el,e)));
   $("resetSurface").addEventListener("click",()=>{markers=structuredClone(DEFAULT_MARKERS);renderMarkers();updateQuality();renderAt(stimulusTime)});
   $("exportConfig").addEventListener("click",()=>{
@@ -209,6 +224,6 @@
   ]).then(([g,f,s])=>{
     gaze=parseGaze(g);fixations=parseFixations(f);stimuli=s;
     recordingZero=fixations.length?fixations[0].start:(gaze.length?gaze[0].deviceTimestamp:0);
-    slider.max=Math.round(stimuli.duration*10);renderStimulusTrack();status.textContent=`P03 · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length} fixations · ${stimuli.events.length} stimulus events`;stage.classList.toggle("show-surface",showSurface.checked);renderAt(0);updateQuality();
+    slider.max=Math.round(stimuli.duration*10);renderStimulusTrack();const recEnd=fixations.length?Math.max(...fixations.map(x=>x.start+x.durationMs/1000)):recordingZero; const recDuration=recEnd-recordingZero; status.textContent=`P03 · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length} fixations · ${stimuli.events.length} stimulus events · recording ${fmt(recDuration)}`;stage.classList.toggle("show-surface",showSurface.checked);renderAt(0);updateQuality();
   }).catch(err=>{console.error(err);status.textContent="Could not load participant data";});
 })();
