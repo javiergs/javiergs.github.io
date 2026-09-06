@@ -18,7 +18,7 @@
   let currentGazeIndex=-1, currentParticipant="P12";
   const PARTICIPANTS={P12:{gaze:"data/P12/gaze.csv",fixations:"data/P12/fixations.csv",affect:"data/P12/affect.txt"},P03:{gaze:"data/P03/gaze.csv",fixations:"data/P03/fixations.csv",affect:"data/P03/affect.txt"}};
   const AFFECT_METRICS=["Focus","Engagement","Excitement","Interest","Relaxation","Stress"];
-  const AFFECT_COLORS={Focus:"#7B2CBF",Engagement:"#009E73",Excitement:"#E69F00",Interest:"#0072B2",Relaxation:"#CC79A7",Stress:"#D55E00"};
+  const AFFECT_COLORS={Focus:"#4C1D95",Engagement:"#009E73",Excitement:"#E69F00",Interest:"#0072B2",Relaxation:"#CC79A7",Stress:"#D55E00"};
   let affectRecordingZeroLocal=0;
   let gazeTimes=[];
   let eventPrefix=new Map();

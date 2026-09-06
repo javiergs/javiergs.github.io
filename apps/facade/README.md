@@ -1,4 +1,4 @@
-# Heart Castle Facade Study Dashboard — v31
+# Heart Castle Facade Study Dashboard — v32
 
 This version adds a **Combined (dominant)** affective gaze heatmap while preserving the existing single-affect heatmaps.
 
