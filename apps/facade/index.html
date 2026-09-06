@@ -20,8 +20,6 @@
 
   <main class="layout">
     <section class="viewer-card">
-      <div id="status" class="working-status">Loading participant data…</div>
-
       <div class="viewer-toolbar">
         <div class="toolbar-group">
           <label>Participant
@@ -72,7 +70,6 @@
           <div class="track-label">Participant data</div>
           <div id="coverageTrack" class="coverage-track"><div id="participantCoverage" class="participant-coverage"></div><div id="timelineCursorCoverage" class="timeline-cursor" aria-hidden="true"></div></div>
         </div>
-        <div class="timeline-meta-row"><strong>Full stimulus video · 04:19.0</strong><span id="coverageText">—</span></div>
       </div>
 
       <div class="stage-wrap">
@@ -95,6 +92,18 @@
     </section>
 
     <aside class="side">
+      <section class="panel recording-panel">
+        <h2>Participant &amp; Recording</h2>
+        <div id="status" class="recording-summary">Loading participant data…</div>
+        <div class="recording-details">
+          <div><span>Stimulus</span><strong>04:19.0</strong></div>
+          <div><span>Participant</span><strong id="participantWindow">—</strong></div>
+          <div><span>Video placed</span><strong id="videoWindow">—</strong></div>
+          <div><span>Outside stimulus</span><strong id="outsideStimulus">—</strong></div>
+        </div>
+        <span id="coverageText" class="sr-only">—</span>
+      </section>
+
       <section class="panel sync-panel">
         <div class="panel-heading">
           <h2>Synchronization</h2>

@@ -171,6 +171,16 @@
     if(after>0)parts.push(`${fmt(after)} participant data after video`);
     if(missingTail>0)parts.push(`${fmt(missingTail)} stimulus video after participant data ends`);
     txt.textContent=parts.join(" · ");
+    const participantWindow=$("participantWindow"), videoWindow=$("videoWindow"), outside=$("outsideStimulus");
+    if(participantWindow) participantWindow.textContent=`${fmt(start)}–${fmt(end)}`;
+    if(videoWindow) videoWindow.textContent=`${fmt(videoStart)}–${fmt(videoEnd)}`;
+    if(outside){
+      const outsideParts=[];
+      if(before>0) outsideParts.push(`${fmt(before)} before`);
+      if(after>0) outsideParts.push(`${fmt(after)} after`);
+      if(missingTail>0) outsideParts.push(`${fmt(missingTail)} stimulus after data`);
+      outside.textContent=outsideParts.length?outsideParts.join(" · "):"none";
+    }
   }
 
   function nearestGazeIndex(recordingSec){
@@ -192,14 +202,15 @@
   function clearHeatmap(){heatCtx.clearRect(0,0,heatmap.width,heatmap.height)}
   function ensureCanvas(){const r=stage.getBoundingClientRect(),w=Math.max(1,Math.round(r.width*devicePixelRatio)),h=Math.max(1,Math.round(r.height*devicePixelRatio));if(heatmap.width!==w||heatmap.height!==h){heatmap.width=w;heatmap.height=h}}
   function heatColor(v){
-    // Perceptual density scale. Red is deliberately reserved for exceptional peaks.
+    // Density scale intentionally keeps most cumulative gaze in blue/green/yellow.
+    // Red is reserved for only the most exceptional hotspots.
     const stops=[
       [0.00,[25,55,190]],
-      [0.24,[0,185,255]],
-      [0.48,[0,205,105]],
-      [0.72,[245,225,20]],
-      [0.90,[255,145,0]],
-      [0.985,[245,55,20]],
+      [0.28,[0,185,255]],
+      [0.56,[0,205,105]],
+      [0.80,[245,225,20]],
+      [0.94,[255,145,0]],
+      [0.992,[245,70,20]],
       [1.00,[170,0,0]]
     ];
     v=clamp(v,0,1);
@@ -220,34 +231,62 @@
     const recStart=recordingStartSec, recEnd=Math.min(t,recordingEndSec);
     if(recEnd<=recStart)return;
 
-    const scale=.30, w=Math.max(120,Math.round(heatmap.width*scale)), h=Math.max(80,Math.round(heatmap.height*scale));
-    const density=document.createElement("canvas"); density.width=w; density.height=h;
-    const dctx=density.getContext("2d"); dctx.globalCompositeOperation="lighter";
-    const radius=Math.max(10,w*.025);
+    // Accumulate density in floating point instead of the canvas alpha channel.
+    // Canvas additive alpha saturates at 255 and was the reason large areas became red.
+    const scale=.28, w=Math.max(120,Math.round(heatmap.width*scale)), h=Math.max(80,Math.round(heatmap.height*scale));
+    const field=new Float32Array(w*h);
+    const radius=Math.max(9,Math.round(w*.022));
+    const r2=radius*radius;
     let i=nearestGazeIndex(recStart), count=0; if(i<0)return;
     while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>recStart)i--;
     for(;i<gaze.length;i++){
       const rt=gaze[i].deviceTimestamp-recordingZero; if(rt>recEnd)break;
       const r=gaze[i]; if(rt<recStart||!validGaze(r))continue;
       if(count++%4)continue;
-      const p=mapSurface(r.surfaceX,r.surfaceY),x=p.x/100*w,y=p.y/100*h;
-      const gr=dctx.createRadialGradient(x,y,0,x,y,radius);
-      gr.addColorStop(0,"rgba(255,255,255,.085)");gr.addColorStop(.45,"rgba(255,255,255,.045)");gr.addColorStop(1,"rgba(255,255,255,0)");
-      dctx.fillStyle=gr; dctx.fillRect(x-radius,y-radius,radius*2,radius*2);
+      const p=mapSurface(r.surfaceX,r.surfaceY),cx=Math.round(p.x/100*(w-1)),cy=Math.round(p.y/100*(h-1));
+      const x0=Math.max(0,cx-radius),x1=Math.min(w-1,cx+radius),y0=Math.max(0,cy-radius),y1=Math.min(h-1,cy+radius);
+      for(let yy=y0;yy<=y1;yy++){
+        const dy=yy-cy;
+        for(let xx=x0;xx<=x1;xx++){
+          const dx=xx-cx,d2=dx*dx+dy*dy; if(d2>r2)continue;
+          // Smooth compact kernel; peak contribution is 1 and never clips.
+          const q=1-d2/r2;
+          field[yy*w+xx]+=q*q;
+        }
+      }
     }
-    const src=dctx.getImageData(0,0,w,h), out=dctx.createImageData(w,h);
-    const vals=[]; for(let k=3;k<src.data.length;k+=4)if(src.data[k]>=3)vals.push(src.data[k]);
+
+    const vals=[];
+    for(const a of field)if(a>.02)vals.push(a);
     if(vals.length<8)return;
     vals.sort((a,b)=>a-b);
-    // Stable robust normalization: background begins near P20, orange is high density,
-    // and only approximately the top 2% of non-zero density can reach the red range.
-    const low=percentile(vals,.20), high=Math.max(low+1,percentile(vals,.98));
-    for(let k=0;k<src.data.length;k+=4){
-      const a=src.data[k+3]; if(a<3)continue;
-      let v=clamp((a-low)/(high-low),0,1);
-      v=Math.pow(v,1.18); // expands blue/green/yellow and compresses the hot end
-      const c=heatColor(v);
-      out.data[k]=c[0];out.data[k+1]=c[1];out.data[k+2]=c[2];out.data[k+3]=Math.round(28+190*Math.pow(v,.8));
+
+    // Ignore the weakest fringe and use an extreme percentile as the upper reference.
+    // P99.7 maps near the beginning of orange/red; true red requires values at the
+    // very top of the cumulative density distribution.
+    const low=percentile(vals,.18);
+    const p95=percentile(vals,.95);
+    const p997=Math.max(p95+1e-6,percentile(vals,.997));
+    const max=vals[vals.length-1];
+    const out=new ImageData(w,h);
+    for(let idx=0;idx<field.length;idx++){
+      const a=field[idx]; if(a<=low)continue;
+      let v;
+      if(a<=p95){
+        // 82% of the visible color range is used below the 95th percentile.
+        v=.82*clamp((a-low)/(p95-low||1),0,1);
+      }else if(a<=p997){
+        // P95..P99.7 moves from yellow toward orange, but not red.
+        v=.82+.14*clamp((a-p95)/(p997-p95||1),0,1);
+      }else{
+        // Only the upper ~0.3% can enter the red tail.
+        v=.96+.04*clamp((a-p997)/(max-p997||1),0,1);
+      }
+      // Slightly suppress the hot end again so broad high-density areas remain orange.
+      v=Math.pow(v,1.12);
+      const c=heatColor(v),k=idx*4;
+      out.data[k]=c[0];out.data[k+1]=c[1];out.data[k+2]=c[2];
+      out.data[k+3]=Math.round(22+190*Math.pow(v,.82));
     }
     const colored=document.createElement("canvas");colored.width=w;colored.height=h;colored.getContext("2d").putImageData(out,0,0);
     heatCtx.imageSmoothingEnabled=true;heatCtx.drawImage(colored,0,0,heatmap.width,heatmap.height);
@@ -466,7 +505,7 @@
       sessionTime=0; syncOffsetInput.value="0.00";
       buildSyncIndex();
       renderStimulusTrack();renderAt(0);updateQuality();updateCoverage();
-      status.textContent=`${id} · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · ${stimuli.events.length} recognized stimulus events · gaze coverage ${fmt(recordingEndSec)}`;
+      status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · gaze coverage <strong>${fmt(recordingEndSec)}</strong>`;
       if(auto)setTimeout(()=>{ if(currentParticipant===id) autoSync(); },120);
     }catch(err){console.error(err);status.textContent=`Could not load ${id} participant data`;}
   }
