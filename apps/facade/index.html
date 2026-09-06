@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Heart Castle Facade Study Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=18?v=14">
+  <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
   <header class="site-header">
@@ -76,7 +76,6 @@
         <div id="stage" class="stage" aria-label="Façade stimulus with gaze and stimulus overlays">
           <img id="facade" src="assets/stimulus/baseline.jpg" alt="Façade stimulus state">
           <canvas id="heatmap" aria-hidden="true"></canvas>
-          <svg id="stimulusOverlay" class="stimulus-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
           <div class="surface-outline" id="surfaceOutline" aria-hidden="true"></div>
 
           <button class="marker" id="markerTL" data-marker="tl" aria-label="Top-left surface point">TL</button>
@@ -104,7 +103,37 @@
         <span id="coverageText" class="sr-only">—</span>
       </section>
 
-      <section class="panel sync-panel">
+      <section class="panel">
+        <h2>Display</h2>
+        <label class="check"><input id="showHeatmap" type="checkbox" checked> Show cumulative heatmap</label>
+        <div class="heatmap-key" aria-label="Heatmap density key"><span>Low</span><i></i><span>High</span></div>
+        <label class="check"><input id="showTrail" type="checkbox" checked> Show recent gaze trail</label>
+        <label class="check"><input id="showSurface" type="checkbox"> Show surface calibration</label>
+        <label class="check"><input id="confidenceFilter" type="checkbox" checked> Hide low-confidence gaze</label>
+        <label class="field">Minimum confidence
+          <input id="minConfidence" type="number" value="0.60" min="0" max="1" step="0.05">
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2>Current state</h2>
+        <dl class="stats">
+          <div><dt>Stimulus</dt><dd id="activeStimulus">None</dd></div>
+          <div><dt>Gaze X</dt><dd id="sx">—</dd></div>
+          <div><dt>Gaze Y</dt><dd id="sy">—</dd></div>
+          <div><dt>Confidence</dt><dd id="confidence">—</dd></div>
+          <div><dt>Fixation</dt><dd id="fixationId">—</dd></div>
+          <div><dt>Sample</dt><dd id="sampleIndex">—</dd></div>
+        </dl>
+      </section>
+
+
+    </aside>
+  </main>
+
+  <section class="lower-workspace">
+    <div class="admin-stack">
+      <section class="panel sync-panel admin-panel">
         <div class="panel-heading">
           <h2>Synchronization</h2>
           <span id="syncQuality" class="quality">Not scored</span>
@@ -127,42 +156,35 @@
         <p id="syncMessage" class="muted small">Auto-sync tests fixation responses against all eight known stimulus zones. Door opening is preferred when available; other zones can anchor the alignment when the door response is missing.</p>
       </section>
 
-      <section class="panel">
-        <h2>Current state</h2>
-        <dl class="stats">
-          <div><dt>Stimulus</dt><dd id="activeStimulus">None</dd></div>
-          <div><dt>Gaze X</dt><dd id="sx">—</dd></div>
-          <div><dt>Gaze Y</dt><dd id="sy">—</dd></div>
-          <div><dt>Confidence</dt><dd id="confidence">—</dd></div>
-          <div><dt>Fixation</dt><dd id="fixationId">—</dd></div>
-          <div><dt>Sample</dt><dd id="sampleIndex">—</dd></div>
-        </dl>
-      </section>
-
-      <section class="panel">
-        <h2>Display</h2>
-        <label class="check"><input id="showStimulus" type="checkbox" checked> Show active stimulus AOI outline</label>
-        <label class="check"><input id="showHeatmap" type="checkbox"> Show cumulative heatmap</label>
-        <div class="heatmap-key" aria-label="Heatmap density key"><span>Low</span><i></i><span>High</span></div>
-        <label class="check"><input id="showTrail" type="checkbox" checked> Show recent gaze trail</label>
-        <label class="check"><input id="showSurface" type="checkbox"> Show surface calibration</label>
-        <label class="check"><input id="confidenceFilter" type="checkbox" checked> Hide low-confidence gaze</label>
-        <label class="field">Minimum confidence
-          <input id="minConfidence" type="number" value="0.60" min="0" max="1" step="0.05">
-        </label>
-      </section>
-
-      <section class="panel">
+      <section class="panel admin-panel">
         <h2>Surface mapping</h2>
         <p class="muted small">The four points map normalized Pupil Surface coordinates onto the canonical façade. Drag only if the gaze overlay needs registration correction.</p>
         <div id="markerInputs" class="marker-inputs"></div>
       </section>
+    </div>
 
-    </aside>
-  </main>
+    <section class="panel participant-video-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Original participant video</h2>
+          <p class="muted small">Independent reference recording for the selected participant. Its playback does not control the dashboard timeline.</p>
+        </div>
+        <span id="participantVideoName" class="video-file-name">P12.mp4</span>
+      </div>
+      <div class="participant-video-wrap">
+        <video id="participantVideo" controls preload="metadata" playsinline>
+          <source id="participantVideoSource" src="videos/P12.mp4" type="video/mp4">
+          Your browser does not support HTML video.
+        </video>
+        <div id="participantVideoMissing" class="video-missing" hidden>
+          Add <strong>P12.mp4</strong> to the <code>videos</code> folder to view the original recording.
+        </div>
+      </div>
+    </section>
+  </section>
 
   <footer class="site-footer" aria-hidden="true"></footer>
 
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

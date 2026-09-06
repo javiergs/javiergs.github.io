@@ -1,9 +1,9 @@
 (() => {
   const $ = id => document.getElementById(id);
   const stage = $("stage"), slider = $("timeSlider"), heatmap = $("heatmap"), heatCtx = heatmap.getContext("2d");
-  const gazePoint = $("gazePoint"), gazeTrail = $("gazeTrail"), stimulusOverlay = $("stimulusOverlay"), outline = $("surfaceOutline");
+  const gazePoint = $("gazePoint"), gazeTrail = $("gazeTrail"), outline = $("surfaceOutline");
   const status = $("status"), syncOffsetInput = $("syncOffset"), overlayMode = $("overlayMode"), facadeView = $("facadeView"), facade = $("facade");
-  const showTrail = $("showTrail"), showStimulus = $("showStimulus"), showHeatmap = $("showHeatmap"), showSurface = $("showSurface"), confidenceFilter = $("confidenceFilter"), minConfidence = $("minConfidence");
+  const showTrail = $("showTrail"), showHeatmap = $("showHeatmap"), showSurface = $("showSurface"), confidenceFilter = $("confidenceFilter"), minConfidence = $("minConfidence");
 
   const DEFAULT_MARKERS = {
     tl:{x:6.7,y:3.6}, tr:{x:95.3,y:3.6}, bl:{x:6.0,y:94.9}, br:{x:94.8,y:95.1}
@@ -110,15 +110,10 @@
     if(facade.getAttribute("src")!==wantedSrc) facade.setAttribute("src",wantedSrc);
     facade.classList.toggle("desaturated",analysis);
 
-    stimulusOverlay.innerHTML="";
+    // AOI geometry remains in stimuli.json for synchronization/scoring, but is not
+    // drawn over the stimulus image. The stimulus frames themselves highlight
+    // the active architectural elements.
     document.querySelectorAll(".stimulus-segment").forEach(b=>b.classList.toggle("active",e&&b.dataset.id===e.id));
-    if(!e||!showStimulus.checked)return;
-    for(const s of e.shapes||[]){
-      const ns="http://www.w3.org/2000/svg",el=document.createElementNS(ns,s.type==="ellipse"?"ellipse":"rect");
-      if(s.type==="rect"){el.setAttribute("x",s.x);el.setAttribute("y",s.y);el.setAttribute("width",s.w);el.setAttribute("height",s.h)}
-      else{el.setAttribute("cx",s.cx);el.setAttribute("cy",s.cy);el.setAttribute("rx",s.rx);el.setAttribute("ry",s.ry)}
-      el.setAttribute("class","aoi aoi-pulse");stimulusOverlay.appendChild(el);
-    }
   }
   function recomputeSessionDuration(){
     const videoStart=videoStartOnSession();
@@ -487,7 +482,7 @@
   syncOffsetInput.addEventListener("input",()=>{updateQuality();renderStimulusTrack();renderAt(sessionTime)});
   $("autoSync").addEventListener("click",autoSync);
   document.querySelectorAll("[data-nudge]").forEach(b=>b.addEventListener("click",()=>{syncOffsetInput.value=(+syncOffsetInput.value + +b.dataset.nudge).toFixed(2);updateQuality();renderStimulusTrack();renderAt(sessionTime)}));
-  [facadeView,overlayMode,showTrail,showStimulus,showHeatmap,showSurface,confidenceFilter,minConfidence].forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(sessionTime)}));
+  [facadeView,overlayMode,showTrail,showHeatmap,showSurface,confidenceFilter,minConfidence].forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(sessionTime)}));
   Object.values(markerEls).forEach(el=>el.addEventListener("pointerdown",e=>beginDrag(el,e)));
   $("resetSurface").addEventListener("click",()=>{markers=structuredClone(DEFAULT_MARKERS);renderMarkers();updateQuality();renderAt(sessionTime)});
   $("exportConfig").addEventListener("click",()=>{
@@ -496,7 +491,32 @@
   });
   window.addEventListener("resize",()=>renderHeatmap(sessionTime));
 
+
+  function updateParticipantVideo(id){
+    const video=$("participantVideo");
+    const source=$("participantVideoSource");
+    const label=$("participantVideoName");
+    const missing=$("participantVideoMissing");
+    if(!video || !source) return;
+    const filename=`${id}.mp4`;
+    const src=`videos/${filename}`;
+    if(label) label.textContent=filename;
+    if(missing){
+      missing.hidden=true;
+      missing.innerHTML=`Add <strong>${filename}</strong> to the <code>videos</code> folder to view the original recording.`;
+    }
+    video.pause();
+    source.src=src;
+    const showMissing=()=>{ if(missing) missing.hidden=false; };
+    const hideMissing=()=>{ if(missing) missing.hidden=true; };
+    video.onerror=showMissing;
+    source.onerror=showMissing;
+    video.onloadedmetadata=hideMissing;
+    video.load();
+  }
+
   async function loadParticipant(id, auto=true){
+    updateParticipantVideo(id);
     stop(); syncRunToken++; currentParticipant=id; status.textContent=`Loading ${id}…`;
     const cfg=PARTICIPANTS[id]; if(!cfg){status.textContent=`No data configured for ${id}`;return;}
     try{
