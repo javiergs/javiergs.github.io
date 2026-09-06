@@ -4,7 +4,7 @@
   const affectHeatmap = $("affectHeatmap"), affectHeatCtx = affectHeatmap ? affectHeatmap.getContext("2d") : null;
   const gazePoint = $("gazePoint"), gazeTrail = $("gazeTrail"), outline = $("surfaceOutline");
   const status = $("status"), syncOffsetInput = $("syncOffset"), overlayMode = $("overlayMode"), facadeView = $("facadeView"), facade = $("facade");
-  const showTrail = $("showTrail"), showHeatmap = $("showHeatmap"), showAffectHeatmap = $("showAffectHeatmap"), showSurface = $("showSurface"), confidenceFilter = $("confidenceFilter"), minConfidence = $("minConfidence");
+  const showTrail = $("showTrail"), showHeatmap = $("showHeatmap"), showAffectHeatmap = $("showAffectHeatmap"), showSurface = $("showSurface"), confidenceFilter = $("confidenceFilter"), minConfidence = $("minConfidence"), minAffect = $("minAffect"), affectHeatMetricSelect = $("affectHeatMetric");
 
   const DEFAULT_MARKERS = {
     tl:{x:6.7,y:3.6}, tr:{x:95.3,y:3.6}, bl:{x:6.0,y:94.9}, br:{x:94.8,y:95.1}
@@ -78,8 +78,7 @@
   }
   function selectedAffectMetrics(){return [...document.querySelectorAll('#affectControls input[data-affect]:checked')].map(i=>i.dataset.affect);}
   function selectedAffectHeatMetric(){
-    const picked=document.querySelector('input[name="affectHeatMetric"]:checked');
-    return picked?.value || "Engagement";
+    return affectHeatMetricSelect?.value || "Engagement";
   }
   function renderAffectChart(){
     const canvas=$("affectChart"); if(!canvas)return;
@@ -172,7 +171,8 @@
       const gr=gaze[i];if(recSec<recordingStartSec||!validGaze(gr))continue;
       if(sample++%4)continue;
       const ar=nearestAffect(recSec),value=ar?.values?.[metric];
-      if(value==null||value<=0)continue;
+      const affectThreshold=clamp(+(minAffect?.value ?? 0.5),0,1);
+      if(value==null||value<affectThreshold)continue;
       const p=mapSurface(gr.surfaceX,gr.surfaceY),cx=Math.round(p.x/100*(fw-1)),cy=Math.round(p.y/100*(fh-1));
       const x0=Math.max(0,cx-radius),x1=Math.min(fw-1,cx+radius),y0=Math.max(0,cy-radius),y1=Math.min(fh-1,cy+radius);
       for(let yy=y0;yy<=y1;yy++){
@@ -204,10 +204,14 @@
     const has=affect.length>0;if(statusEl){statusEl.className='quality '+(has?'good':'weak');statusEl.textContent=has?`${affect.length.toLocaleString()} samples`:'No file';}
     if(coverage){if(!has)coverage.textContent='not available';else{const inStart=Math.max(0,affectSec(affect[0])),inEnd=Math.min(recordingEndSec,affectSec(affect.at(-1)));coverage.textContent=inEnd>inStart?`${fmt(inStart)}–${fmt(inEnd)}`:'outside gaze window';}}
     for(const input of document.querySelectorAll('#affectControls input[data-affect]')){const m=input.dataset.affect,valid=affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec);input.disabled=!valid;if(!valid)input.checked=false;}
-    const heatRadios=[...document.querySelectorAll('input[name="affectHeatMetric"]')];
-    for(const input of heatRadios){const m=input.value,valid=affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec);input.disabled=!valid;}
-    const chosen=heatRadios.find(i=>i.checked&&!i.disabled);
-    if(!chosen){const fallback=heatRadios.find(i=>!i.disabled);if(fallback)fallback.checked=true;}
+    if(affectHeatMetricSelect){
+      let currentValid=false, firstValid=null;
+      for(const option of [...affectHeatMetricSelect.options]){
+        const m=option.value,valid=affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec);
+        option.disabled=!valid;if(valid&&!firstValid)firstValid=m;if(valid&&m===affectHeatMetricSelect.value)currentValid=true;
+      }
+      if(!currentValid&&firstValid)affectHeatMetricSelect.value=firstValid;
+    }
   }
 
   function solve(A,b){
@@ -647,7 +651,7 @@
   syncOffsetInput.addEventListener("input",()=>{updateQuality();renderStimulusTrack();renderAt(sessionTime)});
   $("autoSync").addEventListener("click",autoSync);
   document.querySelectorAll("[data-nudge]").forEach(b=>b.addEventListener("click",()=>{syncOffsetInput.value=(+syncOffsetInput.value + +b.dataset.nudge).toFixed(2);updateQuality();renderStimulusTrack();renderAt(sessionTime)}));
-  [facadeView,overlayMode,showTrail,showHeatmap,showAffectHeatmap,showSurface,confidenceFilter,minConfidence].filter(Boolean).forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(sessionTime)}));
+  [facadeView,overlayMode,showTrail,showHeatmap,showAffectHeatmap,showSurface,confidenceFilter,minConfidence,minAffect].filter(Boolean).forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(sessionTime)}));
   Object.values(markerEls).forEach(el=>el.addEventListener("pointerdown",e=>beginDrag(el,e)));
   $("resetSurface").addEventListener("click",()=>{markers=structuredClone(DEFAULT_MARKERS);renderMarkers();updateQuality();renderAt(sessionTime)});
   $("exportConfig").addEventListener("click",()=>{
@@ -656,7 +660,7 @@
   });
   window.addEventListener("resize",()=>{renderHeatmap(sessionTime);renderAffectChart();renderAffectHeatmap();});
   document.querySelectorAll('#affectControls input[data-affect]').forEach(el=>el.addEventListener('change',()=>{renderAffectChart();renderAffectProminence();renderAffectHeatmap();}));
-  document.querySelectorAll('input[name="affectHeatMetric"]').forEach(el=>el.addEventListener('change',()=>{renderAffectHeatmap();document.querySelectorAll('.affect-heatmap-picker label').forEach(l=>l.classList.toggle('selected',l.querySelector('input')?.checked));}));
+  if(affectHeatMetricSelect) affectHeatMetricSelect.addEventListener('change',()=>renderAffectHeatmap());
   if(showHeatmap&&showAffectHeatmap){
     showHeatmap.addEventListener('change',()=>{if(showHeatmap.checked){showAffectHeatmap.checked=false;}renderAt(sessionTime);});
     showAffectHeatmap.addEventListener('change',()=>{if(showAffectHeatmap.checked){showHeatmap.checked=false;}renderAt(sessionTime);});

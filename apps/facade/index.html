@@ -5,7 +5,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <title>Heart Castle Facade Study Dashboard</title>
-<link href="style.css?v=28" rel="stylesheet"/>
+<link href="style.css?v=29" rel="stylesheet"/>
 </head>
 <body>
 <header class="site-header">
@@ -53,6 +53,26 @@
 </select>
 </label>
 <span class="study-window-note">Numbered blocks = recognized stimuli · gray = wait / baseline.</span>
+</div>
+<div class="display-inline-controls" aria-label="Display controls">
+  <span class="display-inline-label">Display</span>
+  <label class="compact-check"><input id="showHeatmap" type="checkbox"/> Gaze heatmap</label>
+  <label class="compact-check"><input checked id="showAffectHeatmap" type="checkbox"/> Affective heatmap</label>
+  <label class="compact-field affect-metric-field">Affect
+    <select id="affectHeatMetric">
+      <option value="Focus">Focus</option>
+      <option selected value="Engagement">Engagement</option>
+      <option value="Excitement">Excitement</option>
+      <option value="Interest">Interest</option>
+      <option value="Relaxation">Relaxation</option>
+      <option value="Stress">Stress</option>
+    </select>
+  </label>
+  <label class="compact-field">Minimum affect <input id="minAffect" type="number" min="0" max="1" step="0.05" value="0.50"/></label>
+  <label class="compact-check"><input checked id="showTrail" type="checkbox"/> Gaze trail</label>
+  <label class="compact-check"><input id="showSurface" type="checkbox"/> Surface</label>
+  <label class="compact-check"><input checked id="confidenceFilter" type="checkbox"/> Confidence filter</label>
+  <label class="compact-field">Minimum confidence <input id="minConfidence" max="1" min="0" step="0.05" type="number" value="0.60"/></label>
 </div>
 <div class="timeline-grid">
 <div class="track-label">Timeline</div>
@@ -119,18 +139,7 @@
 
 <div class="affective-zone-summary" id="dominantZones"></div>
 </section>
-<section class="dashboard-row controls-row">
-<section class="panel"><h2>Display</h2><label class="check"><input id="showHeatmap" type="checkbox"/> Show cumulative gaze heatmap</label><div class="heatmap-key"><span>Low</span><i></i><span>High</span></div><label class="check"><input checked="" id="showAffectHeatmap" type="checkbox"/> Show affective gaze heatmap</label>
-<div class="affect-heatmap-picker" id="affectHeatmapPicker" aria-label="Affective heatmap measure">
-  <span class="field-label">Affective heatmap measure</span>
-  <label style="--affect-color:#7B2CBF"><input name="affectHeatMetric" type="radio" value="Focus"/><span class="affect-dot"></span>Focus</label>
-  <label style="--affect-color:#009E73"><input checked name="affectHeatMetric" type="radio" value="Engagement"/><span class="affect-dot"></span>Engagement</label>
-  <label style="--affect-color:#E69F00"><input name="affectHeatMetric" type="radio" value="Excitement"/><span class="affect-dot"></span>Excitement</label>
-  <label style="--affect-color:#0072B2"><input name="affectHeatMetric" type="radio" value="Interest"/><span class="affect-dot"></span>Interest</label>
-  <label style="--affect-color:#CC79A7"><input name="affectHeatMetric" type="radio" value="Relaxation"/><span class="affect-dot"></span>Relaxation</label>
-  <label style="--affect-color:#D55E00"><input name="affectHeatMetric" type="radio" value="Stress"/><span class="affect-dot"></span>Stress</label>
-</div>
-<div class="affect-intensity-key" id="affectIntensityKey"><span>0</span><i></i><span>1</span></div><label class="check"><input checked="" id="showTrail" type="checkbox"/> Show recent gaze trail</label><label class="check"><input id="showSurface" type="checkbox"/> Show surface calibration</label><label class="check"><input checked="" id="confidenceFilter" type="checkbox"/> Hide low-confidence gaze</label><label class="field">Minimum confidence<input id="minConfidence" max="1" min="0" step="0.05" type="number" value="0.60"/></label></section>
+<section class="dashboard-row controls-row current-state-row">
 <section class="panel"><h2>Current state</h2>
 <div class="state-sections">
 <div class="state-group"><h3>Visual / gaze</h3><dl class="stats"><div><dt>Stimulus</dt><dd id="activeStimulus">None</dd></div><div><dt>Gaze X</dt><dd id="sx">—</dd></div><div><dt>Gaze Y</dt><dd id="sy">—</dd></div><div><dt>Confidence</dt><dd id="confidence">—</dd></div><div><dt>Fixation</dt><dd id="fixationId">—</dd></div><div><dt>Sample</dt><dd id="sampleIndex">—</dd></div></dl></div>
@@ -150,6 +159,6 @@
 </section>
 </main>
 <footer aria-hidden="true" class="site-footer"></footer>
-<script src="app.js?v=28"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>
