@@ -12,7 +12,7 @@
   const markerEls = {tl:$("markerTL"),tr:$("markerTR"),bl:$("markerBL"),br:$("markerBR")};
 
   let gaze=[], fixations=[], stimuli={duration:259,events:[]};
-  let recordingZero=0, stimulusTime=0, playing=false, raf=0, lastAnimation=0;
+  let recordingZero=0, recordingStartSec=0, recordingEndSec=0, stimulusTime=0, playing=false, raf=0, lastAnimation=0;
   let currentGazeIndex=-1;
 
   const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -105,11 +105,61 @@
     }
   }
   function renderStimulusTrack(){
-    const track=$("stimulusTrack"), legend=$("stimulusLegend");track.innerHTML="";legend.innerHTML="";
-    stimuli.events.forEach((e,idx)=>{
-      const n=idx+1,b=document.createElement("button");b.className="stimulus-segment";b.dataset.id=e.id;b.title=`${n}. ${e.label}: ${fmt(e.start)}–${fmt(e.end)}`;b.textContent=String(n);b.style.left=(e.start/stimuli.duration*100)+"%";b.style.width=((e.end-e.start)/stimuli.duration*100)+"%";b.addEventListener("click",()=>{stop();renderAt(e.start)});track.appendChild(b);
-      const k=document.createElement("button");k.innerHTML=`<strong>${n}.</strong> ${e.label}`;k.title=`Jump to ${fmt(e.start)}`;k.addEventListener("click",()=>{stop();renderAt(e.start)});legend.appendChild(k);
+    const track=$("stimulusTrack"), legend=$("stimulusLegend");
+    track.innerHTML=""; legend.innerHTML="";
+
+    // Draw every neutral interval explicitly so the viewer sees the wait/baseline periods.
+    let cursor=0;
+    stimuli.events.forEach(e=>{
+      if(e.start>cursor){
+        const w=document.createElement("div");
+        w.className="wait-segment";
+        w.style.left=(cursor/stimuli.duration*100)+"%";
+        w.style.width=((e.start-cursor)/stimuli.duration*100)+"%";
+        w.title=`Wait / baseline: ${fmt(cursor)}–${fmt(e.start)}`;
+        track.appendChild(w);
+      }
+      cursor=Math.max(cursor,e.end);
     });
+    if(cursor<stimuli.duration){
+      const w=document.createElement("div");w.className="wait-segment";w.style.left=(cursor/stimuli.duration*100)+"%";w.style.width=((stimuli.duration-cursor)/stimuli.duration*100)+"%";w.title=`Wait / baseline: ${fmt(cursor)}–${fmt(stimuli.duration)}`;track.appendChild(w);
+    }
+
+    stimuli.events.forEach((e,idx)=>{
+      const n=idx+1,b=document.createElement("button");
+      b.className="stimulus-segment"+(e.syncAnchor?" anchor":"");
+      b.dataset.id=e.id;
+      b.title=`${n}. ${e.label}: ${fmt(e.start)}–${fmt(e.end)}${e.syncAnchor?" · primary synchronization anchor":""}`;
+      b.textContent=String(n);
+      b.style.left=(e.start/stimuli.duration*100)+"%";
+      b.style.width=((e.end-e.start)/stimuli.duration*100)+"%";
+      b.addEventListener("click",()=>{stop();renderAt(e.start)});
+      track.appendChild(b);
+
+      const k=document.createElement("button");
+      k.innerHTML=`<strong>${n}.</strong> ${e.label}`;
+      k.dataset.time=`${fmt(e.start)}–${fmt(e.end)}`;
+      k.title=`Jump to ${fmt(e.start)}`;
+      k.addEventListener("click",()=>{stop();renderAt(e.start)});
+      legend.appendChild(k);
+    });
+    updateCoverage();
+  }
+
+  function updateCoverage(){
+    const bar=$("participantCoverage"), txt=$("coverageText");
+    if(!bar||!txt||!stimuli.duration)return;
+    const off=+syncOffsetInput.value||0;
+    // recording time = stimulus time + offset, so coverage on stimulus clock is recording - offset.
+    const rawStart=recordingStartSec-off, rawEnd=recordingEndSec-off;
+    const start=clamp(rawStart,0,stimuli.duration), end=clamp(rawEnd,0,stimuli.duration);
+    bar.style.left=(start/stimuli.duration*100)+"%";
+    bar.style.width=(Math.max(0,end-start)/stimuli.duration*100)+"%";
+    const before=Math.max(0,-rawStart), after=Math.max(0,rawEnd-stimuli.duration);
+    const parts=[`${fmt(start)}–${fmt(end)}`];
+    if(before>0)parts.push(`${fmt(before)} recorder lead-in`);
+    if(after>0)parts.push(`${fmt(after)} recorder tail`);
+    txt.textContent=parts.join(" · ");
   }
 
   function nearestGazeIndex(recordingSec){
@@ -135,6 +185,7 @@
   }
   function renderHeatmap(t){
     ensureCanvas(); clearHeatmap();
+    heatmap.style.display = showHeatmap.checked ? "block" : "none";
     if(!showHeatmap.checked) return;
     const off=+syncOffsetInput.value||0;
     // Cumulative participant heatmap: deterministic at every slider position.
@@ -168,6 +219,7 @@
     else{gazePoint.style.display="none";gazeTrail.innerHTML="";}
     const f=currentFixation(recTime);$("fixationId").textContent=f?`#${f.id} · ${Math.round(f.durationMs)} ms`:"—";
     renderHeatmap(stimulusTime);
+    updateCoverage();
   }
 
   function scoreOffset(offset,detail=false){
@@ -187,16 +239,45 @@
     }
     return {score:max?weighted/max:0,hits,used,offset};
   }
+  function findDoorGazeAnchor(){
+    const door=stimuli.events.find(e=>e.syncAnchor)||stimuli.events.find(e=>e.id==="door-open");
+    if(!door)return null;
+    // First sustained run inside the door AOI. Require >=150 ms total with short gaps tolerated.
+    const minConfidenceValue=Math.max(.55,+minConfidence.value||0);
+    let runStart=null,lastInside=null,insideCount=0;
+    for(let i=0;i<gaze.length;i++){
+      const r=gaze[i];
+      const rt=r.deviceTimestamp-recordingZero;
+      if(r.confidence<minConfidenceValue)continue;
+      const p=mapSurface(r.surfaceX,r.surfaceY),inside=eventContains(door,p);
+      if(inside){
+        if(runStart===null || (lastInside!==null && rt-lastInside>.12)){runStart=rt;insideCount=1;}
+        else insideCount++;
+        lastInside=rt;
+        if(lastInside-runStart>=.15 && insideCount>=4){
+          return {recordingTime:runStart,stimulusTime:door.start,offset:runStart-door.start,event:door};
+        }
+      }else if(lastInside!==null && rt-lastInside>.12){
+        runStart=null;lastInside=null;insideCount=0;
+      }
+    }
+    return null;
+  }
+
   function autoSync(){
-    $("autoSync").disabled=true;$("autoSync").textContent="Estimating…";$("syncMessage").textContent="Searching offsets against the sequence of stimulus AOIs…";
+    const btn=$("autoSync");btn.disabled=true;btn.textContent="Finding door gaze…";
+    $("syncMessage").textContent="Looking for the first sustained gaze response inside the door AOI…";
     setTimeout(()=>{
-      let best={score:-1,offset:0,hits:0,used:0};
-      for(let off=0;off<=90;off+=.10){const s=scoreOffset(off);if(s.score>best.score)best=s;}
-      // refine around the coarse maximum
-      const coarse=best.offset;for(let off=Math.max(0,coarse-.15);off<=coarse+.15;off+=.01){const s=scoreOffset(off);if(s.score>best.score)best=s;}
-      syncOffsetInput.value=best.offset.toFixed(2);updateQuality(best);renderAt(stimulusTime);
-      $("syncMessage").textContent=`Best behavioral alignment: ${best.offset.toFixed(2)} s offset; ${best.hits}/${best.used} stimulus AOIs received a gaze response within 2.5 s. Treat this as an estimate until AOI timings are refined.`;
-      $("autoSync").disabled=false;$("autoSync").textContent="Estimate from stimulus responses";
+      const anchor=findDoorGazeAnchor();
+      if(!anchor){
+        $("syncMessage").textContent="No sustained door-gaze anchor was found automatically. Use the offset controls to align the recording manually.";
+        btn.disabled=false;btn.textContent="Sync from door gaze";return;
+      }
+      syncOffsetInput.value=anchor.offset.toFixed(2);
+      const validation=scoreOffset(anchor.offset);
+      updateQuality(validation);updateCoverage();renderAt(stimulusTime);
+      $("syncMessage").textContent=`Door gaze detected at recording ${fmt(anchor.recordingTime)} and aligned to door opening at stimulus ${fmt(anchor.stimulusTime)}. Estimated offset: ${anchor.offset.toFixed(2)} s. Later AOIs provide a validation score (${validation.hits}/${validation.used} responses).`;
+      btn.disabled=false;btn.textContent="Sync from door gaze";
     },30);
   }
   function updateQuality(s=scoreOffset(+syncOffsetInput.value||0)){
@@ -229,6 +310,15 @@
   ]).then(([g,f,s])=>{
     gaze=parseGaze(g);fixations=parseFixations(f);stimuli=s;
     recordingZero=fixations.length?fixations[0].start:(gaze.length?gaze[0].deviceTimestamp:0);
-    slider.max=Math.round(stimuli.duration*10);renderStimulusTrack();const recEnd=fixations.length?Math.max(...fixations.map(x=>x.start+x.durationMs/1000)):recordingZero; const recDuration=recEnd-recordingZero; status.textContent=`P03 · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length} fixations · ${stimuli.events.length} stimulus events · recording ${fmt(recDuration)}`;stage.classList.toggle("show-surface",showSurface.checked);renderAt(0);updateQuality();
+    const gazeStart=gaze.length?gaze[0].deviceTimestamp-recordingZero:0;
+    const gazeEnd=gaze.length?gaze[gaze.length-1].deviceTimestamp-recordingZero:0;
+    const fixStart=fixations.length?fixations[0].start-recordingZero:gazeStart;
+    const fixEnd=fixations.length?Math.max(...fixations.map(x=>x.start+x.durationMs/1000))-recordingZero:gazeEnd;
+    recordingStartSec=Math.min(gazeStart,fixStart,0);
+    recordingEndSec=Math.max(gazeEnd,fixEnd);
+    const recDuration=recordingEndSec-recordingStartSec;
+    slider.max=Math.round(stimuli.duration*10);renderStimulusTrack();
+    status.textContent=`P03 · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length} fixations · ${stimuli.events.length} recognized stimulus events · recording ${fmt(recDuration)}`;
+    stage.classList.toggle("show-surface",showSurface.checked);renderAt(0);updateQuality();updateCoverage();
   }).catch(err=>{console.error(err);status.textContent="Could not load participant data";});
 })();

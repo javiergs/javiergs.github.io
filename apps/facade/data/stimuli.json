@@ -1,206 +1,96 @@
 {
-  "duration": 259,
-  "note": "Starter stimulus timeline derived from 1-second frame sampling. Times and AOIs are intentionally editable and should be refined from dense frame extraction around each transition.",
+  "duration": 259.0,
+  "note": "Full visual-stimulus video timeline. Event boundaries are provisional estimates from the extracted frame sequence and manual review; neutral intervals are wait/baseline periods.",
   "events": [
     {
       "id": "door-open",
-      "label": "Door / central opening",
-      "start": 6.5,
-      "end": 17.0,
+      "label": "Door opens",
+      "start": 8.0,
+      "end": 18.0,
       "weight": 1.5,
+      "syncAnchor": true,
       "shapes": [
-        {
-          "type": "rect",
-          "x": 41.5,
-          "y": 56.0,
-          "w": 17.0,
-          "h": 35.0
-        }
+        {"type":"rect","x":41.5,"y":56.0,"w":17.0,"h":35.0}
       ]
     },
     {
-      "id": "upper-central",
-      "label": "Upper central vertical element",
-      "start": 51.5,
-      "end": 78.0,
+      "id": "top-figure",
+      "label": "Top figure",
+      "start": 54.0,
+      "end": 70.0,
       "weight": 1.0,
       "shapes": [
-        {
-          "type": "rect",
-          "x": 46.1,
-          "y": 20.5,
-          "w": 7.8,
-          "h": 17.0
-        }
+        {"type":"rect","x":46.1,"y":20.5,"w":7.8,"h":17.0}
       ]
     },
     {
-      "id": "central-ornament",
-      "label": "Central ornament above door",
-      "start": 78.0,
-      "end": 107.0,
+      "id": "central-group",
+      "label": "Central group above door",
+      "start": 79.0,
+      "end": 103.0,
       "weight": 1.0,
       "shapes": [
-        {
-          "type": "ellipse",
-          "cx": 50.0,
-          "cy": 48.5,
-          "rx": 9.0,
-          "ry": 5.5
-        }
+        {"type":"ellipse","cx":50.0,"cy":48.5,"rx":9.0,"ry":5.5}
       ]
     },
     {
-      "id": "doorway-figures",
-      "label": "Paired doorway figures",
-      "start": 107.0,
+      "id": "wild-men",
+      "label": "Two Wild Men",
+      "start": 112.0,
       "end": 157.0,
       "weight": 1.0,
       "shapes": [
-        {
-          "type": "rect",
-          "x": 31.5,
-          "y": 53.0,
-          "w": 8.0,
-          "h": 21.0
-        },
-        {
-          "type": "rect",
-          "x": 60.5,
-          "y": 53.0,
-          "w": 8.0,
-          "h": 21.0
-        }
+        {"type":"rect","x":31.5,"y":53.0,"w":8.0,"h":21.0},
+        {"type":"rect","x":60.5,"y":53.0,"w":8.0,"h":21.0}
       ]
     },
     {
-      "id": "upper-detail",
-      "label": "Upper / central detail",
-      "start": 157.0,
-      "end": 163.0,
-      "weight": 0.8,
+      "id": "door-bright",
+      "label": "Door brightened",
+      "start": 164.0,
+      "end": 182.0,
+      "weight": 1.3,
       "shapes": [
-        {
-          "type": "rect",
-          "x": 42.5,
-          "y": 34.0,
-          "w": 15.0,
-          "h": 13.0
-        }
+        {"type":"rect","x":41.5,"y":56.0,"w":17.0,"h":35.0}
       ]
     },
     {
-      "id": "door-highlight",
-      "label": "Door highlight",
-      "start": 163.0,
-      "end": 187.0,
-      "weight": 1.5,
-      "shapes": [
-        {
-          "type": "rect",
-          "x": 41.5,
-          "y": 56.0,
-          "w": 17.0,
-          "h": 35.0
-        }
-      ]
-    },
-    {
-      "id": "lateral-ornaments",
-      "label": "Lateral ornaments",
-      "start": 187.0,
-      "end": 222.0,
+      "id": "corner-elements",
+      "label": "Two corner elements",
+      "start": 194.0,
+      "end": 215.0,
       "weight": 1.0,
       "shapes": [
-        {
-          "type": "ellipse",
-          "cx": 19.3,
-          "cy": 63.0,
-          "rx": 3.2,
-          "ry": 3.7
-        },
-        {
-          "type": "ellipse",
-          "cx": 80.7,
-          "cy": 63.0,
-          "rx": 3.2,
-          "ry": 3.7
-        }
+        {"type":"ellipse","cx":19.3,"cy":63.0,"rx":3.2,"ry":3.7},
+        {"type":"ellipse","cx":80.7,"cy":63.0,"rx":3.2,"ry":3.7}
       ]
     },
     {
-      "id": "upper-circular",
-      "label": "Upper circular ornaments",
+      "id": "lateral-figures",
+      "label": "Two lateral figures",
       "start": 222.0,
-      "end": 232.0,
+      "end": 228.0,
       "weight": 1.0,
       "shapes": [
-        {
-          "type": "ellipse",
-          "cx": 40.5,
-          "cy": 39.0,
-          "rx": 4.0,
-          "ry": 5.0
-        },
-        {
-          "type": "ellipse",
-          "cx": 59.5,
-          "cy": 39.0,
-          "rx": 4.0,
-          "ry": 5.0
-        }
+        {"type":"ellipse","cx":40.5,"cy":39.0,"rx":4.0,"ry":5.0},
+        {"type":"ellipse","cx":59.5,"cy":39.0,"rx":4.0,"ry":5.0}
       ]
     },
     {
-      "id": "upper-horizontal",
-      "label": "Upper horizontal details",
-      "start": 232.0,
-      "end": 242.0,
-      "weight": 0.9,
+      "id": "upper-four",
+      "label": "Upper four figures / elements",
+      "start": 233.0,
+      "end": 240.0,
+      "weight": 1.0,
       "shapes": [
-        {
-          "type": "rect",
-          "x": 13.5,
-          "y": 12.0,
-          "w": 73.0,
-          "h": 16.0
-        }
-      ]
-    },
-    {
-      "id": "combined",
-      "label": "Combined highlighted regions",
-      "start": 242.0,
-      "end": 257.0,
-      "weight": 0.7,
-      "shapes": [
-        {
-          "type": "rect",
-          "x": 41.5,
-          "y": 56.0,
-          "w": 17.0,
-          "h": 35.0
-        },
-        {
-          "type": "rect",
-          "x": 46.1,
-          "y": 20.5,
-          "w": 7.8,
-          "h": 17.0
-        },
-        {
-          "type": "ellipse",
-          "cx": 50.0,
-          "cy": 48.5,
-          "rx": 9.0,
-          "ry": 5.5
-        }
+        {"type":"rect","x":13.5,"y":12.0,"w":73.0,"h":16.0}
       ]
     }
   ],
-  "studyWindow": {
-    "duration": 205.0,
-    "label": "Study stimulus window",
-    "note": "The analyzed study interval is 3:25. Source material outside this interval is treated as extra; exact placement will be refined from synchronization anchors."
+  "sync": {
+    "primaryAnchorEvent": "door-open",
+    "primaryAnchorTime": 8.0,
+    "method": "Align the participant's first sustained gaze response inside the door AOI to the door-opening event, then use later AOI responses as a validation score.",
+    "note": "The behavioral response can lag stimulus onset, so the resulting offset is an estimate and may be manually refined."
   }
 }

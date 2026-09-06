@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Heart Castle Facade Study Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
   <header class="site-header">
@@ -40,6 +40,35 @@
         </div>
       </div>
 
+      <div class="timeline-area">
+        <div class="playback">
+          <button id="playPause" class="play" type="button">▶</button>
+          <div class="time-stack">
+            <input id="timeSlider" type="range" min="0" max="2050" value="0" step="1" aria-label="Study stimulus timeline">
+            <div class="time-row">
+              <span><strong id="stimulusTime">00:00.0</strong> stimulus</span>
+              <span id="durationLabel">03:25.0</span>
+            </div>
+          </div>
+          <label>Speed
+            <select id="speed">
+              <option value="0.25">0.25×</option>
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+            </select>
+          </label>
+        </div>
+        <div class="study-window-summary">
+          <span><strong>Full stimulus video</strong> · 04:19.0</span>
+          <span class="study-window-note">Numbered blocks = recognized stimuli · gray blocks = wait / baseline.</span>
+        </div>
+        <div id="stimulusTrack" class="stimulus-track" aria-label="Stimulus events and wait periods"></div>
+        <div class="coverage-row"><span>Participant data</span><div id="coverageTrack" class="coverage-track"><div id="participantCoverage" class="participant-coverage"></div></div><span id="coverageText">—</span></div>
+        <div id="stimulusLegend" class="stimulus-legend" aria-label="Stimulus event legend"></div>
+      </div>
+
       <div class="stage-wrap">
         <div id="stage" class="stage" aria-label="Façade stimulus with gaze and stimulus overlays">
           <img id="facade" src="assets/facade.png" alt="Canonical façade stimulus">
@@ -57,33 +86,6 @@
           <div id="stimulusBadge" class="stimulus-badge">No active stimulus</div>
         </div>
       </div>
-
-      <div class="playback">
-        <button id="playPause" class="play" type="button">▶</button>
-        <div class="time-stack">
-          <input id="timeSlider" type="range" min="0" max="2590" value="0" step="1" aria-label="Stimulus timeline">
-          <div class="time-row">
-            <span><strong id="stimulusTime">00:00.0</strong> stimulus</span>
-            <span id="durationLabel">04:19.0</span>
-          </div>
-        </div>
-        <label>Speed
-          <select id="speed">
-            <option value="0.25">0.25×</option>
-            <option value="0.5">0.5×</option>
-            <option value="1" selected>1×</option>
-            <option value="2">2×</option>
-            <option value="4">4×</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="study-window-summary">
-        <span><strong>Study stimulus window</strong> · 03:25.0</span>
-        <span class="study-window-note">Areas before/after are extra source material</span>
-      </div>
-      <div id="stimulusTrack" class="stimulus-track" aria-label="Stimulus events"></div>
-      <div id="stimulusLegend" class="stimulus-legend" aria-label="Stimulus event legend"></div>
     </section>
 
     <aside class="side">
@@ -102,12 +104,12 @@
           <button data-nudge="0.1">+0.1</button>
           <button data-nudge="1">+1 s</button>
         </div>
-        <button id="autoSync" class="primary" type="button">Estimate from stimulus responses</button>
+        <button id="autoSync" class="primary" type="button">Sync from door gaze</button>
         <div class="sync-readout">
           <span>Stimulus <strong id="syncStimulusTime">—</strong></span>
           <span>Recording <strong id="recordingTime">—</strong></span>
         </div>
-        <p id="syncMessage" class="muted small">Starter offset uses the previously identified P03 action anchor; use Auto-sync or nudge it after AOIs are refined.</p>
+        <p id="syncMessage" class="muted small">Auto-sync uses the first sustained gaze response to the opening door as the primary anchor, then checks later stimulus AOIs as validation.</p>
       </section>
 
       <section class="panel">
@@ -143,6 +145,6 @@
     </aside>
   </main>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
