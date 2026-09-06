@@ -1,9 +1,10 @@
 (() => {
   const $ = id => document.getElementById(id);
   const stage = $("stage"), slider = $("timeSlider"), heatmap = $("heatmap"), heatCtx = heatmap.getContext("2d");
+  const affectHeatmap = $("affectHeatmap"), affectHeatCtx = affectHeatmap ? affectHeatmap.getContext("2d") : null;
   const gazePoint = $("gazePoint"), gazeTrail = $("gazeTrail"), outline = $("surfaceOutline");
   const status = $("status"), syncOffsetInput = $("syncOffset"), overlayMode = $("overlayMode"), facadeView = $("facadeView"), facade = $("facade");
-  const showTrail = $("showTrail"), showHeatmap = $("showHeatmap"), showSurface = $("showSurface"), confidenceFilter = $("confidenceFilter"), minConfidence = $("minConfidence");
+  const showTrail = $("showTrail"), showHeatmap = $("showHeatmap"), showAffectHeatmap = $("showAffectHeatmap"), showSurface = $("showSurface"), confidenceFilter = $("confidenceFilter"), minConfidence = $("minConfidence");
 
   const DEFAULT_MARKERS = {
     tl:{x:6.7,y:3.6}, tr:{x:95.3,y:3.6}, bl:{x:6.0,y:94.9}, br:{x:94.8,y:95.1}
@@ -15,7 +16,7 @@
   let recordingZero=0, recordingStartSec=0, recordingEndSec=0, sessionTime=0, playing=false, raf=0, lastAnimation=0;
   let sessionDuration=0;
   let currentGazeIndex=-1, currentParticipant="P12";
-  const PARTICIPANTS={P12:{gaze:"data/P12-gaze.csv",fixations:"data/P12-fixations.csv",affect:"data/P12-affect.csv"},P03:{gaze:"data/P03-gaze.csv",fixations:"data/P03-fixations.csv",affect:null}};
+  const PARTICIPANTS={P12:{gaze:"data/P12/gaze.csv",fixations:"data/P12/fixations.csv",affect:"data/P12/affect.txt"},P03:{gaze:"data/P03/gaze.csv",fixations:"data/P03/fixations.csv",affect:"data/P03/affect.txt"}};
   const AFFECT_METRICS=["Focus","Engagement","Excitement","Interest","Relaxation","Stress"];
   const AFFECT_COLORS={Focus:"#7655a6",Engagement:"#1f7a4c",Excitement:"#e08b22",Interest:"#2775a5",Relaxation:"#6b9f72",Stress:"#b64d4d"};
   let affectRecordingZeroLocal=0;
@@ -98,11 +99,12 @@
     ctx.restore();
   }
   function renderAffectCurrent(recSec){
-    const r=nearestAffect(recSec),box=$("affectNow"),state=$("currentAffect");
-    if(!r){if(box)box.textContent='No valid affective sample at this synchronized moment.';if(state)state.textContent='—';return;}
+    const r=nearestAffect(recSec),box=$("affectNow");
+    for(const m of AFFECT_METRICS){const el=$("state"+m);if(el)el.textContent='—';}
+    if(!r){if(box)box.textContent='No valid affective sample at this synchronized moment.';return;}
     const vals=AFFECT_METRICS.filter(m=>r.values[m]!=null).map(m=>`${m} ${r.values[m].toFixed(3)}`);
     if(box)box.textContent=vals.length?`${fmt(recSec)} · ${vals.join(' · ')}`:'Affective sample present, but all channels are inactive.';
-    if(state){const best=AFFECT_METRICS.filter(m=>r.values[m]!=null).sort((a,b)=>r.values[b]-r.values[a])[0];state.textContent=best?`${best} ${r.values[best].toFixed(3)}`:'—';}
+    for(const m of AFFECT_METRICS){const el=$("state"+m);if(el)el.textContent=r.values[m]==null?'—':r.values[m].toFixed(3);}
   }
   function zoneAffectStats(event,cutoff){
     const start=videoStartOnSession()+event.start,end=Math.min(videoStartOnSession()+event.end,cutoff);if(end<=start)return null;
@@ -110,13 +112,53 @@
     for(const r of affect){const sec=affectSec(r);if(sec<start)continue;if(sec>end)break;for(const m of AFFECT_METRICS){const v=r.values[m];if(v!=null){sums[m]+=v;counts[m]++;}}}
     const means={};for(const m of AFFECT_METRICS)means[m]=counts[m]?sums[m]/counts[m]:null;return means;
   }
+  function dominantAffect(st){
+    if(!st)return null;
+    const valid=AFFECT_METRICS.filter(m=>st[m]!=null).sort((a,b)=>st[b]-st[a]);
+    return valid.length?{metric:valid[0],value:st[valid[0]]}:null;
+  }
   function renderAffectProminence(){
-    const box=$("affectProminence"),dom=$("dominantZones");if(!box||!dom)return;box.innerHTML='';dom.innerHTML='';
-    const corner=document.createElement('div');corner.className='prominence-cell prominence-label';corner.textContent='Measure';box.appendChild(corner);
-    stimuli.events.forEach((e,i)=>{const d=document.createElement('div');d.className='prominence-cell prominence-zone';d.textContent=`Z${i+1}`;d.title=e.label;box.appendChild(d)});
+    const dom=$("dominantZones");if(!dom)return;dom.innerHTML='';
     const stats=stimuli.events.map(e=>zoneAffectStats(e,sessionTime));
-    for(const m of AFFECT_METRICS){const lab=document.createElement('div');lab.className='prominence-cell prominence-label';lab.textContent=m;box.appendChild(lab);for(const st of stats){const v=st?.[m];const c=document.createElement('div');c.className='prominence-cell '+(v==null?'prominence-empty':'');if(v==null)c.textContent='—';else{const a=.08+.72*clamp(v,0,1);c.style.background=`rgba(25,62,44,${a.toFixed(3)})`;c.style.color=v>.48?'#fff':'#193e2c';c.textContent=v.toFixed(3);}box.appendChild(c);}}
-    stats.forEach((st,i)=>{const chip=document.createElement('div');chip.className='dominant-chip';if(!st){chip.innerHTML=`<strong>Z${i+1}</strong><span>not reached</span>`;}else{const valid=AFFECT_METRICS.filter(m=>st[m]!=null).sort((a,b)=>st[b]-st[a]);chip.innerHTML=valid.length?`<strong>Z${i+1} · ${valid[0]}</strong><span>${st[valid[0]].toFixed(3)}</span>`:`<strong>Z${i+1}</strong><span>no valid affect</span>`;}dom.appendChild(chip);});
+    stats.forEach((st,i)=>{
+      const chip=document.createElement('div');chip.className='affective-zone-chip';
+      const top=dominantAffect(st);
+      if(!st){chip.innerHTML=`<strong>Z${i+1}</strong><span>not reached</span>`;chip.classList.add('not-reached');}
+      else if(!top){chip.innerHTML=`<strong>Z${i+1}</strong><span>no valid affect</span>`;chip.classList.add('not-reached');}
+      else{
+        const c=AFFECT_COLORS[top.metric];
+        chip.style.setProperty('--zone-color',c);
+        chip.innerHTML=`<strong>Z${i+1}</strong><span class="zone-top">${top.metric}</span><b>${top.value.toFixed(3)}</b>`;
+        chip.title=`${stimuli.events[i].label} · dominant ${top.metric} ${top.value.toFixed(3)}`;
+      }
+      dom.appendChild(chip);
+    });
+  }
+  function hexToRgb(hex){const h=hex.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+  function renderAffectHeatmap(){
+    if(!affectHeatmap||!affectHeatCtx)return;
+    const rect=affectHeatmap.getBoundingClientRect(),dpr=window.devicePixelRatio||1,w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));
+    if(affectHeatmap.width!==w||affectHeatmap.height!==h){affectHeatmap.width=w;affectHeatmap.height=h;}
+    affectHeatCtx.clearRect(0,0,w,h);
+    if(!showAffectHeatmap?.checked || !affect.length)return;
+    affectHeatCtx.save();affectHeatCtx.scale(dpr,dpr);
+    const W=rect.width,H=rect.height;
+    for(const e of stimuli.events){
+      const st=zoneAffectStats(e,sessionTime),top=dominantAffect(st);if(!top)continue;
+      const [r,g,b]=hexToRgb(AFFECT_COLORS[top.metric]);
+      const alpha=.10+.38*clamp(top.value,0,1);
+      affectHeatCtx.fillStyle=`rgba(${r},${g},${b},${alpha.toFixed(3)})`;
+      affectHeatCtx.strokeStyle=`rgba(${r},${g},${b},${Math.min(.85,alpha+.28).toFixed(3)})`;
+      affectHeatCtx.lineWidth=1.5;
+      affectHeatCtx.shadowColor=`rgba(${r},${g},${b},.55)`;affectHeatCtx.shadowBlur=18;
+      for(const sh of (e.shapes||[])){
+        affectHeatCtx.beginPath();
+        if(sh.type==='rect')affectHeatCtx.rect(W*sh.x/100,H*sh.y/100,W*sh.w/100,H*sh.h/100);
+        else if(sh.type==='ellipse')affectHeatCtx.ellipse(W*sh.cx/100,H*sh.cy/100,W*sh.rx/100,H*sh.ry/100,0,0,Math.PI*2);
+        affectHeatCtx.fill();affectHeatCtx.shadowBlur=0;affectHeatCtx.stroke();affectHeatCtx.shadowBlur=18;
+      }
+    }
+    affectHeatCtx.restore();
   }
   function updateAffectAvailability(){
     const statusEl=$("affectStatus"),coverage=$("affectCoverage");
@@ -400,6 +442,7 @@
     renderAffectChart();
     renderAffectCurrent(hasRecording?recTime:NaN);
     renderAffectProminence();
+    renderAffectHeatmap();
     updateCoverage();
   }
 
@@ -561,15 +604,15 @@
   syncOffsetInput.addEventListener("input",()=>{updateQuality();renderStimulusTrack();renderAt(sessionTime)});
   $("autoSync").addEventListener("click",autoSync);
   document.querySelectorAll("[data-nudge]").forEach(b=>b.addEventListener("click",()=>{syncOffsetInput.value=(+syncOffsetInput.value + +b.dataset.nudge).toFixed(2);updateQuality();renderStimulusTrack();renderAt(sessionTime)}));
-  [facadeView,overlayMode,showTrail,showHeatmap,showSurface,confidenceFilter,minConfidence].forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(sessionTime)}));
+  [facadeView,overlayMode,showTrail,showHeatmap,showAffectHeatmap,showSurface,confidenceFilter,minConfidence].filter(Boolean).forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(sessionTime)}));
   Object.values(markerEls).forEach(el=>el.addEventListener("pointerdown",e=>beginDrag(el,e)));
   $("resetSurface").addEventListener("click",()=>{markers=structuredClone(DEFAULT_MARKERS);renderMarkers();updateQuality();renderAt(sessionTime)});
   $("exportConfig").addEventListener("click",()=>{
     const data={participant:currentParticipant,syncOffsetSeconds:+syncOffsetInput.value,surfaceMarkersPercent:markers,stimulusFile:"data/stimuli.json",note:"Offset is recording time minus stimulus-video time; the dashboard timeline spans all synchronized recording and stimulus data."};
     const a=document.createElement("a"),blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});a.href=URL.createObjectURL(blob);a.download=`${currentParticipant}-sync-config.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
   });
-  window.addEventListener("resize",()=>{renderHeatmap(sessionTime);renderAffectChart();});
-  document.querySelectorAll('#affectControls input[data-affect]').forEach(el=>el.addEventListener('change',()=>{renderAffectChart();renderAffectProminence();}));
+  window.addEventListener("resize",()=>{renderHeatmap(sessionTime);renderAffectChart();renderAffectHeatmap();});
+  document.querySelectorAll('#affectControls input[data-affect]').forEach(el=>el.addEventListener('change',()=>{renderAffectChart();renderAffectProminence();renderAffectHeatmap();}));
 
 
   function formatVideoClock(sec){
