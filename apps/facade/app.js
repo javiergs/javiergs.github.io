@@ -158,21 +158,28 @@
     const recEnd=Math.min(sessionTime,recordingEndSec);
     if(recEnd<=recordingStartSec)return;
 
-    // Each pixel stores a kernel-weighted MEAN affect value, not a cumulative count.
-    // Therefore repeated viewing does not make a location "hotter" merely because more time passed.
-    // Gaze determines where evidence exists; the selected affect's 0–1 value determines tone/intensity.
+    // Persistent affective memory heatmap. Every qualifying gaze sample remains visible
+    // after it occurs, but its spatial evidence fades toward a light floor as it gets older.
+    // Looking at the same area again while the selected affect is present reinforces it.
+    // Hue identifies the affect; tone identifies its 0–1 value; alpha carries recency/reinforcement.
     const scale=.30, fw=Math.max(120,Math.round(w*scale)), fh=Math.max(80,Math.round(h*scale));
-    const weightedValue=new Float32Array(fw*fh), weightSum=new Float32Array(fw*fh);
+    const weightedValue=new Float32Array(fw*fh), temporalSupport=new Float32Array(fw*fh);
     const radius=Math.max(7,Math.round(fw*.016)),r2=radius*radius;
+    const memoryFloor=.10;       // old evidence never vanishes completely
+    const decaySeconds=42;      // recent evidence fades smoothly toward the floor
     let i=nearestGazeIndex(recordingStartSec),sample=0;if(i<0)return;
     while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>recordingStartSec)i--;
     for(;i<gaze.length;i++){
       const recSec=gaze[i].deviceTimestamp-recordingZero;if(recSec>recEnd)break;
       const gr=gaze[i];if(recSec<recordingStartSec||!validGaze(gr))continue;
-      if(sample++%4)continue;
+      // Pupil gaze is high frequency. Subsample so reinforcement reflects sustained/repeated
+      // viewing without letting raw sampling rate dominate the heatmap.
+      if(sample++%16)continue;
       const ar=nearestAffect(recSec),value=ar?.values?.[metric];
       const affectThreshold=clamp(+(minAffect?.value ?? 0.5),0,1);
       if(value==null||value<affectThreshold)continue;
+      const age=Math.max(0,recEnd-recSec);
+      const temporalWeight=memoryFloor+(1-memoryFloor)*Math.exp(-age/decaySeconds);
       const p=mapSurface(gr.surfaceX,gr.surfaceY),cx=Math.round(p.x/100*(fw-1)),cy=Math.round(p.y/100*(fh-1));
       const x0=Math.max(0,cx-radius),x1=Math.min(fw-1,cx+radius),y0=Math.max(0,cy-radius),y1=Math.min(fh-1,cy+radius);
       for(let yy=y0;yy<=y1;yy++){
@@ -180,20 +187,22 @@
         for(let xx=x0;xx<=x1;xx++){
           const dx=xx-cx,d2=dx*dx+dy*dy;if(d2>r2)continue;
           const q=1-d2/r2,k=q*q,idx=yy*fw+xx;
-          weightedValue[idx]+=k*value;weightSum[idx]+=k;
+          const evidence=k*temporalWeight;
+          weightedValue[idx]+=evidence*value;
+          temporalSupport[idx]+=evidence;
         }
       }
     }
 
     const out=new ImageData(fw,fh);
-    for(let idx=0;idx<weightSum.length;idx++){
-      const support=weightSum[idx];if(support<=.025)continue;
+    for(let idx=0;idx<temporalSupport.length;idx++){
+      const support=temporalSupport[idx];if(support<=.008)continue;
       const value=clamp(weightedValue[idx]/support,0,1);
       if(value<=.01)continue;
       const {rgb,alpha}=affectTone(metric,value);
-      // support only softens the very edge of each gaze kernel; it saturates quickly and
-      // does not serve as the heat value. The selected affect remains the intensity encoding.
-      const supportMask=clamp(support/.18,0,1);
+      // A single old response stays faint; recent or repeatedly reinforced evidence becomes opaque.
+      // Log compression prevents long fixations from immediately saturating the entire kernel.
+      const supportMask=clamp(Math.log1p(support*2.2)/Math.log1p(5.5),0,1);
       const k=idx*4;out.data[k]=rgb[0];out.data[k+1]=rgb[1];out.data[k+2]=rgb[2];out.data[k+3]=Math.round(255*alpha*supportMask);
     }
     const colored=document.createElement('canvas');colored.width=fw;colored.height=fh;colored.getContext('2d').putImageData(out,0,0);
