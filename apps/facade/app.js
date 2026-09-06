@@ -63,7 +63,7 @@
   }
   function mapSurface(u,v){
     const H=homography(); if(!H)return{x:50,y:50};
-    const vv=1-v,d=H[6]*u+H[7]*vv+H[8];
+    const vv=v,d=H[6]*u+H[7]*vv+H[8];
     return{x:(H[0]*u+H[1]*vv+H[2])/d,y:(H[3]*u+H[4]*vv+H[5])/d};
   }
 
@@ -189,18 +189,26 @@
   function clearHeatmap(){heatCtx.clearRect(0,0,heatmap.width,heatmap.height)}
   function ensureCanvas(){const r=stage.getBoundingClientRect(),w=Math.max(1,Math.round(r.width*devicePixelRatio)),h=Math.max(1,Math.round(r.height*devicePixelRatio));if(heatmap.width!==w||heatmap.height!==h){heatmap.width=w;heatmap.height=h}}
   function heatColor(v){
+    // Perceptual density scale. Red is deliberately reserved for exceptional peaks.
     const stops=[
-      [0.00,[20,45,185]],
-      [0.25,[0,190,255]],
-      [0.50,[0,210,95]],
-      [0.75,[255,225,0]],
-      [1.00,[235,35,35]]
+      [0.00,[25,55,190]],
+      [0.24,[0,185,255]],
+      [0.48,[0,205,105]],
+      [0.72,[245,225,20]],
+      [0.90,[255,145,0]],
+      [0.985,[245,55,20]],
+      [1.00,[170,0,0]]
     ];
     v=clamp(v,0,1);
     for(let i=1;i<stops.length;i++){
       if(v<=stops[i][0]){const [p0,c0]=stops[i-1],[p1,c1]=stops[i],q=(v-p0)/(p1-p0);return c0.map((c,j)=>Math.round(c+(c1[j]-c)*q));}
     }
     return stops.at(-1)[1];
+  }
+  function percentile(sorted,p){
+    if(!sorted.length)return 0;
+    const x=clamp(p,0,1)*(sorted.length-1),lo=Math.floor(x),hi=Math.ceil(x),q=x-lo;
+    return sorted[lo]*(1-q)+sorted[hi]*q;
   }
   function renderHeatmap(t){
     ensureCanvas(); clearHeatmap();
@@ -225,12 +233,18 @@
       dctx.fillStyle=gr; dctx.fillRect(x-radius,y-radius,radius*2,radius*2);
     }
     const src=dctx.getImageData(0,0,w,h), out=dctx.createImageData(w,h);
-    let maxA=0; for(let k=3;k<src.data.length;k+=4)maxA=Math.max(maxA,src.data[k]);
-    if(maxA<2)return;
+    const vals=[]; for(let k=3;k<src.data.length;k+=4)if(src.data[k]>=3)vals.push(src.data[k]);
+    if(vals.length<8)return;
+    vals.sort((a,b)=>a-b);
+    // Stable robust normalization: background begins near P20, orange is high density,
+    // and only approximately the top 2% of non-zero density can reach the red range.
+    const low=percentile(vals,.20), high=Math.max(low+1,percentile(vals,.98));
     for(let k=0;k<src.data.length;k+=4){
       const a=src.data[k+3]; if(a<3)continue;
-      const v=Math.pow(a/maxA,.72), c=heatColor(v);
-      out.data[k]=c[0];out.data[k+1]=c[1];out.data[k+2]=c[2];out.data[k+3]=Math.round(35+205*v);
+      let v=clamp((a-low)/(high-low),0,1);
+      v=Math.pow(v,1.18); // expands blue/green/yellow and compresses the hot end
+      const c=heatColor(v);
+      out.data[k]=c[0];out.data[k+1]=c[1];out.data[k+2]=c[2];out.data[k+3]=Math.round(28+190*Math.pow(v,.8));
     }
     const colored=document.createElement("canvas");colored.width=w;colored.height=h;colored.getContext("2d").putImageData(out,0,0);
     heatCtx.imageSmoothingEnabled=true;heatCtx.drawImage(colored,0,0,heatmap.width,heatmap.height);
@@ -270,21 +284,38 @@
   }
 
   function scoreOffset(offset,detail=false){
-    let weighted=0,max=0,hits=0,used=0;
+    // General participant-independent validation. Each known stimulus zone is projected
+    // onto the participant recording; evidence may occur anywhere in the active zone
+    // plus a short human-response tail. Missing a zone is neutral rather than fatal.
+    let weighted=0,possible=0,hits=0,used=0;
+    const matches=[];
     for(const e of stimuli.events.filter(e=>e.id!=="combined")){
-      const w=e.weight||1;max+=w;used++;
-      const startRec=e.start+offset,endRec=startRec+2.5,preStart=startRec-1.2;
-      let i=nearestGazeIndex(preStart),best=null,preInside=false;
+      const w=e.weight||1, startRec=e.start+offset, endRec=e.end+offset;
+      if(endRec<recordingStartSec || startRec>recordingEndSec)continue;
+      used++; possible+=w;
+      const preStart=startRec-1.5, responseEnd=Math.min(recordingEndSec,endRec+2.0);
+      let i=nearestGazeIndex(preStart),insideActive=0,totalActive=0,insidePre=0,totalPre=0,firstInside=null;
       while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>preStart)i--;
       for(;i<gaze.length;i++){
-        const rt=gaze[i].deviceTimestamp-recordingZero;if(rt>endRec)break;if(rt<preStart||gaze[i].confidence<.55)continue;
-        const p=mapSurface(gaze[i].surfaceX,gaze[i].surfaceY),inside=eventContains(e,p);
-        if(inside&&rt<startRec)preInside=true;
-        if(inside&&rt>=startRec&&best===null)best=rt-startRec;
+        const r=gaze[i],rt=r.deviceTimestamp-recordingZero;if(rt>responseEnd)break;
+        if(rt<preStart||r.confidence<.55)continue;
+        const inside=eventContains(e,mapSurface(r.surfaceX,r.surfaceY));
+        if(rt<startRec){totalPre++;if(inside)insidePre++;}
+        else {totalActive++;if(inside){insideActive++;if(firstInside===null)firstInside=rt;}}
       }
-      if(best!==null){let s=Math.max(0,1-best/2.5);if(preInside)s*=.55;weighted+=w*s;hits++;}
+      if(!totalActive)continue;
+      const activeRatio=insideActive/totalActive, preRatio=totalPre?insidePre/totalPre:0;
+      // Reward a meaningful increase/occupancy in the AOI, but allow sustained attention
+      // that began just before the nominal boundary because event boundaries are approximate.
+      const contrast=Math.max(0,activeRatio-preRatio*.45);
+      const occupancy=Math.min(1,activeRatio/.12);
+      let s=.60*occupancy+.40*Math.min(1,contrast/.10);
+      if(insideActive>=4 && activeRatio>=.035){weighted+=w*s;hits++;matches.push({event:e,score:s,ratio:activeRatio,firstInside});}
     }
-    return {score:max?weighted/max:0,hits,used,offset};
+    // Coverage matters, but an unseen stimulus is not treated as contradictory evidence.
+    const agreement=possible?weighted/possible:0;
+    const support=used?hits/used:0;
+    return {score:.78*agreement+.22*support,hits,used,offset,matches};
   }
   function fixationCandidatesForEvent(event){
     const minConf=Math.max(.55,+minConfidence.value||0), out=[];
@@ -295,49 +326,52 @@
       let i=nearestGazeIndex(startSec),inside=0,total=0;
       while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>startSec)i--;
       for(;i<gaze.length;i++){
-        const r=gaze[i],rt=r.deviceTimestamp-recordingZero;
-        if(rt>endSec)break;
+        const r=gaze[i],rt=r.deviceTimestamp-recordingZero;if(rt>endSec)break;
         if(rt<startSec||r.confidence<minConf)continue;
-        total++; if(eventContains(event,mapSurface(r.surfaceX,r.surfaceY)))inside++;
+        total++;if(eventContains(event,mapSurface(r.surfaceX,r.surfaceY)))inside++;
       }
       if(total<4)continue;
       const ratio=inside/total;
-      if(ratio>=.60)out.push({event,fixation:f,recordingTime:startSec,ratio});
+      if(ratio>=.55)out.push({event,fixation:f,recordingTime:startSec,ratio});
     }
     return out;
   }
   function findBestSyncAnchor(){
-    let candidates=[];
+    const candidates=[];
     for(const event of stimuli.events){
       for(const c of fixationCandidatesForEvent(event)){
-        const offset=c.recordingTime-event.start;
-        // The full 4:19 stimulus should normally sit mostly inside the gaze recording.
-        // Keep broad bounds so participants with missing lead-in/tail data still work.
-        if(offset < recordingStartSec-stimuli.duration || offset > recordingEndSec)continue;
-        const validation=scoreOffset(offset);
-        const fixationQuality=c.ratio*Math.min(1,c.fixation.durationMs/180);
-        const doorBonus=event.syncAnchor?.10:0;
-        const combined=validation.score*.74 + fixationQuality*.16 + doorBonus;
-        candidates.push({...c,offset,validation,combined});
+        // A fixation may follow event onset. Generate several plausible response latencies
+        // instead of assuming every fixation starts exactly at the stimulus boundary.
+        const latencies=[0,.5,1.0,1.75,2.5];
+        for(const latency of latencies){
+          const offset=c.recordingTime-event.start-latency;
+          if(offset<recordingStartSec-stimuli.duration || offset>recordingEndSec)continue;
+          const validation=scoreOffset(offset);
+          const fixationQuality=c.ratio*Math.min(1,c.fixation.durationMs/220);
+          const distinctive=(event.syncAnchor?.045:0)+(event.id==="top-figure"?.02:0);
+          const combined=validation.score*.86+fixationQuality*.10+distinctive;
+          candidates.push({...c,offset,latency,validation,combined});
+        }
       }
     }
     if(!candidates.length)return null;
-    candidates.sort((a,b)=>b.combined-a.combined || b.validation.hits-a.validation.hits || (b.event.syncAnchor?1:0)-(a.event.syncAnchor?1:0));
+    candidates.sort((a,b)=>b.combined-a.combined||b.validation.hits-a.validation.hits||b.ratio-a.ratio);
     return candidates[0];
   }
   function autoSync(){
     const btn=$("autoSync");btn.disabled=true;btn.textContent="Testing stimulus zones…";
-    $("syncMessage").textContent="Testing fixation responses against Zones 1–8. Door opening has priority, while later zones can provide or confirm the alignment.";
+    $("syncMessage").textContent="Generating candidate offsets from fixation responses in all eight known AOIs, then selecting the offset with the strongest cross-zone agreement. No participant-specific offset is used.";
     setTimeout(()=>{
       const anchor=findBestSyncAnchor();
       if(!anchor){
-        $("syncMessage").textContent="No qualifying fixation-to-stimulus alignment was found. The offset can still be adjusted manually.";
+        $("syncMessage").textContent="No qualifying multi-zone alignment was found. The offset can still be adjusted manually.";
         btn.disabled=false;btn.textContent="Auto-sync from stimulus zones";return;
       }
       syncOffsetInput.value=anchor.offset.toFixed(2);
       updateQuality(anchor.validation);renderStimulusTrack();renderAt(sessionTime);
       const zone=stimuli.events.indexOf(anchor.event)+1;
-      $("syncMessage").textContent=`Best anchor: Zone ${zone} (${anchor.event.label}), fixation #${anchor.fixation.id} at participant ${fmt(anchor.recordingTime)}. This places stimulus video 0:00 at participant ${fmt(anchor.offset)}. AOI coverage ${(anchor.ratio*100).toFixed(0)}%; cross-zone confirmation ${anchor.validation.hits}/${anchor.validation.used}.`;
+      const supported=anchor.validation.matches.map(m=>stimuli.events.indexOf(m.event)+1).join(", ")||"none";
+      $("syncMessage").textContent=`Best candidate: Zone ${zone} (${anchor.event.label}), fixation #${anchor.fixation.id} at participant ${fmt(anchor.recordingTime)}. Estimated stimulus-video start: participant ${fmt(anchor.offset)}. Supporting zones: ${supported} (${anchor.validation.hits}/${anchor.validation.used}); anchor AOI coverage ${(anchor.ratio*100).toFixed(0)}%.`;
       btn.disabled=false;btn.textContent="Auto-sync from stimulus zones";
     },30);
   }
