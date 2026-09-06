@@ -153,10 +153,10 @@
     const before=Math.max(0,videoStart-start);
     const after=Math.max(0,end-videoEnd);
     const missingTail=Math.max(0,videoEnd-end);
-    const parts=[`participant ${fmt(start)}–${fmt(end)}`, `video ${fmt(videoStart)}–${fmt(videoEnd)}`];
-    if(before>0)parts.push(`${fmt(before)} data before video`);
-    if(after>0)parts.push(`${fmt(after)} data after video`);
-    if(missingTail>0)parts.push(`${fmt(missingTail)} video after data ends`);
+    const parts=[`participant ${fmt(start)}–${fmt(end)}`, `video placed at ${fmt(videoStart)}–${fmt(videoEnd)}`];
+    if(before>0)parts.push(`${fmt(before)} participant data before video`);
+    if(after>0)parts.push(`${fmt(after)} participant data after video`);
+    if(missingTail>0)parts.push(`${fmt(missingTail)} stimulus video after participant data ends`);
     txt.textContent=parts.join(" · ");
   }
 
@@ -209,6 +209,8 @@
     slider.value=Math.round(sessionTime*10);
     $("sessionTime").textContent=fmt(sessionTime);
     $("durationLabel").textContent=fmt(sessionDuration);
+    const cursorPct=sessionDuration?sessionTime/sessionDuration*100:0;
+    [$("timelineCursorSlider"),$("timelineCursorStimulus"),$("timelineCursorCoverage")].forEach(el=>{if(el)el.style.left=cursorPct+"%";});
 
     const videoStart=videoStartOnSession();
     const videoTime=videoTimeFromSession(sessionTime);
@@ -251,53 +253,72 @@
     }
     return {score:max?weighted/max:0,hits,used,offset};
   }
-  function findDoorGazeAnchor(){
+  function fixationDoorCandidates(){
+    const door=stimuli.events.find(e=>e.syncAnchor)||stimuli.events.find(e=>e.id==="door-open");
+    if(!door)return [];
+    const minConf=Math.max(.55,+minConfidence.value||0);
+    const out=[];
+    for(const f of fixations){
+      if(f.durationMs<80 || f.confidence<minConf)continue;
+      const startSec=f.start-recordingZero, endSec=startSec+f.durationMs/1000;
+      let i=nearestGazeIndex(startSec),inside=0,total=0,sumX=0,sumY=0;
+      while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>startSec)i--;
+      for(;i<gaze.length;i++){
+        const r=gaze[i],rt=r.deviceTimestamp-recordingZero;
+        if(rt>endSec)break;
+        if(rt<startSec||r.confidence<minConf)continue;
+        const p=mapSurface(r.surfaceX,r.surfaceY); total++; sumX+=p.x; sumY+=p.y;
+        if(eventContains(door,p))inside++;
+      }
+      if(total<4)continue;
+      const ratio=inside/total;
+      if(ratio>=.60)out.push({fixation:f,recordingTime:startSec,ratio,meanX:sumX/total,meanY:sumY/total});
+    }
+    return out;
+  }
+  function findDoorFixationAnchor(){
     const door=stimuli.events.find(e=>e.syncAnchor)||stimuli.events.find(e=>e.id==="door-open");
     if(!door)return null;
-    // First sustained run inside the door AOI. Require >=150 ms total with short gaps tolerated.
-    const minConfidenceValue=Math.max(.55,+minConfidence.value||0);
-    let runStart=null,lastInside=null,insideCount=0;
-    for(let i=0;i<gaze.length;i++){
-      const r=gaze[i];
-      const rt=r.deviceTimestamp-recordingZero;
-      if(r.confidence<minConfidenceValue)continue;
-      const p=mapSurface(r.surfaceX,r.surfaceY),inside=eventContains(door,p);
-      if(inside){
-        if(runStart===null || (lastInside!==null && rt-lastInside>.12)){runStart=rt;insideCount=1;}
-        else insideCount++;
-        lastInside=rt;
-        if(lastInside-runStart>=.15 && insideCount>=4){
-          return {recordingTime:runStart,stimulusTime:door.start,offset:runStart-door.start,event:door};
-        }
-      }else if(lastInside!==null && rt-lastInside>.12){
-        runStart=null;lastInside=null;insideCount=0;
-      }
-    }
-    return null;
+    const candidates=fixationDoorCandidates();
+    if(!candidates.length)return null;
+    // Use the current offset as a coarse estimate, then snap to the strongest nearby
+    // fixation on the door. This avoids choosing incidental door looks during recorder lead-in.
+    const currentOffset=+syncOffsetInput.value||0;
+    const expected=currentOffset+door.start;
+    const nearby=candidates.filter(c=>Math.abs(c.recordingTime-expected)<=15);
+    const pool=nearby.length?nearby:candidates;
+    pool.sort((a,b)=>{
+      const qa=a.ratio*Math.min(1,a.fixation.durationMs/180);
+      const qb=b.ratio*Math.min(1,b.fixation.durationMs/180);
+      const da=Math.abs(a.recordingTime-expected), db=Math.abs(b.recordingTime-expected);
+      return (qb-.012*db)-(qa-.012*da);
+    });
+    const c=pool[0];
+    return {recordingTime:c.recordingTime,stimulusTime:door.start,offset:c.recordingTime-door.start,event:door,fixation:c.fixation,ratio:c.ratio};
   }
 
   function autoSync(){
     const btn=$("autoSync");btn.disabled=true;btn.textContent="Finding door gaze…";
-    $("syncMessage").textContent="Looking for the first sustained gaze response inside the door AOI…";
+    $("syncMessage").textContent="Looking for a fixation on the door near the current synchronization estimate…";
     setTimeout(()=>{
-      const anchor=findDoorGazeAnchor();
+      const anchor=findDoorFixationAnchor();
       if(!anchor){
-        $("syncMessage").textContent="No sustained door-gaze anchor was found automatically. Use the offset controls to align the recording manually.";
-        btn.disabled=false;btn.textContent="Sync from door gaze";return;
+        $("syncMessage").textContent="No qualifying fixation on the door was found. Use the offset controls to place the video approximately, then try again.";
+        btn.disabled=false;btn.textContent="Sync from door fixation";return;
       }
       syncOffsetInput.value=anchor.offset.toFixed(2);
       const validation=scoreOffset(anchor.offset);
       updateQuality(validation);renderStimulusTrack();renderAt(sessionTime);
-      $("syncMessage").textContent=`Door gaze detected at recording ${fmt(anchor.recordingTime)} and aligned to door opening at stimulus ${fmt(anchor.stimulusTime)}. Estimated offset: ${anchor.offset.toFixed(2)} s. Later AOIs provide a validation score (${validation.hits}/${validation.used} responses).`;
-      btn.disabled=false;btn.textContent="Sync from door gaze";
+      $("syncMessage").textContent=`Door fixation #${anchor.fixation.id} at recording ${fmt(anchor.recordingTime)} is aligned to door opening at video ${fmt(anchor.stimulusTime)}. Estimated video start: ${fmt(anchor.offset)} into the participant recording. Door-AOI coverage during the fixation: ${(anchor.ratio*100).toFixed(0)}%. Later AOIs provide a validation score (${validation.hits}/${validation.used}).`;
+      btn.disabled=false;btn.textContent="Sync from door fixation";
     },30);
   }
   function updateQuality(s=scoreOffset(+syncOffsetInput.value||0)){
     const q=$("syncQuality");q.className="quality";let label="Weak";if(s.score>=.55&&s.hits>=4){label="Strong";q.classList.add("good")}else if(s.score>=.30&&s.hits>=2){label="Moderate";q.classList.add("mid")}else q.classList.add("weak");q.textContent=`${label} · ${(s.score*100).toFixed(0)}%`;
   }
 
-  function animation(now){if(!playing)return;if(!lastAnimation)lastAnimation=now;const dt=(now-lastAnimation)/1000;lastAnimation=now;const next=stimulusTime+dt*(+$("speed").value||1);if(next>=stimuli.duration){renderAt(stimuli.duration);stop();return}renderAt(next);raf=requestAnimationFrame(animation)}
-  function play(){if(stimulusTime>=stimuli.duration)stimulusTime=0;playing=true;lastAnimation=0;$("playPause").textContent="❚❚";raf=requestAnimationFrame(animation)}
+  function animation(now){if(!playing)return;if(!lastAnimation)lastAnimation=now;const dt=(now-lastAnimation)/1000;lastAnimation=now;const next=sessionTime+dt*(+$("speed").value||1);if(next>=sessionDuration){renderAt(sessionDuration);stop();return}renderAt(next);raf=requestAnimationFrame(animation)}
+  function play(){if(sessionTime>=sessionDuration)sessionTime=0;playing=true;lastAnimation=0;$("playPause").textContent="❚❚";raf=requestAnimationFrame(animation)}
   function stop(){playing=false;cancelAnimationFrame(raf);$("playPause").textContent="▶"}
 
   $("playPause").addEventListener("click",()=>playing?stop():play());
@@ -312,7 +333,7 @@
     const data={participant:"P03",syncOffsetSeconds:+syncOffsetInput.value,surfaceMarkersPercent:markers,stimulusFile:"data/stimuli.json",note:"Offset is recording time minus stimulus-video time; the dashboard timeline spans all synchronized recording and stimulus data."};
     const a=document.createElement("a"),blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});a.href=URL.createObjectURL(blob);a.download="P03-sync-config.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
   });
-  window.addEventListener("resize",()=>renderHeatmap(stimulusTime));
+  window.addEventListener("resize",()=>renderHeatmap(sessionTime));
 
   renderMarkerInputs();
   Promise.all([

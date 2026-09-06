@@ -284,3 +284,28 @@ body {
   .track-label{text-align:left}
   .coverage-text{margin-left:0}
 }
+
+/* v9: one shared horizontal geometry for slider, stimulus video, and participant data. */
+.timeline-area{padding:10px 12px 12px}
+.timeline-controls{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.timeline-controls label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.timeline-controls .study-window-note{margin-left:auto;color:var(--muted);font-size:11px}
+.timeline-grid{display:grid;grid-template-columns:92px minmax(0,1fr);gap:7px 10px;align-items:center}
+.track-label{text-align:right;color:var(--muted);font-size:11px;font-weight:700;white-space:nowrap}
+.slider-track-cell{position:relative;min-width:0;padding:0 3px}
+#timeSlider{display:block;width:100%;margin:0;height:18px}
+.time-row{display:flex;justify-content:space-between;margin-top:-1px;color:var(--muted);font-size:10px;font-variant-numeric:tabular-nums}
+.timeline-grid .stimulus-track,.timeline-grid .coverage-track{margin:0 !important;width:100%;min-width:0}
+.stimulus-track{height:46px}
+.coverage-track{height:10px}
+.timeline-meta-row{margin:6px 3px 0 102px;display:flex;gap:14px;justify-content:space-between;align-items:baseline;color:var(--muted);font-size:10px;font-variant-numeric:tabular-nums}
+.timeline-meta-row strong{color:var(--brand-deep);font-size:10px}
+.timeline-cursor{position:absolute;top:0;bottom:0;width:2px;background:rgba(242,201,76,.95);z-index:8;pointer-events:none;transform:translateX(-1px)}
+.slider-track-cell .slider-cursor{top:2px;bottom:15px}
+.stimulus-track,.coverage-track{position:relative}
+.site-footer{width:100%;height:54px;margin-top:28px;background:var(--brand);border-top:4px solid var(--brand-2)}
+@media(max-width:760px){
+  .timeline-controls{flex-wrap:wrap}.timeline-controls .study-window-note{width:100%;margin-left:0}
+  .timeline-grid{grid-template-columns:76px minmax(0,1fr)}
+  .timeline-meta-row{margin-left:86px;display:block}
+}

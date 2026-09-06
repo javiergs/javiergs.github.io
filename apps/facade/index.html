@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Heart Castle Facade Study Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
   <header class="site-header">
@@ -41,15 +41,8 @@
       </div>
 
       <div class="timeline-area">
-        <div class="playback">
-          <button id="playPause" class="play" type="button">▶</button>
-          <div class="time-stack">
-            <input id="timeSlider" type="range" min="0" max="2050" value="0" step="1" aria-label="Synchronized recording and stimulus timeline">
-            <div class="time-row">
-              <span><strong id="sessionTime">00:00.0</strong> timeline</span>
-              <span id="durationLabel">—</span>
-            </div>
-          </div>
+        <div class="timeline-controls">
+          <button id="playPause" class="play" type="button" aria-label="Play or pause">▶</button>
           <label>Speed
             <select id="speed">
               <option value="0.25">0.25×</option>
@@ -59,18 +52,21 @@
               <option value="4">4×</option>
             </select>
           </label>
-        </div>
-        <div class="study-window-summary">
-          <span><strong>Full stimulus video</strong> · 04:19.0</span>
           <span class="study-window-note">Numbered blocks = recognized stimuli · gray = wait / baseline · hover for details.</span>
         </div>
-        <div class="timeline-track-stack">
+        <div class="timeline-grid">
+          <div class="track-label">Timeline</div>
+          <div class="slider-track-cell">
+            <input id="timeSlider" type="range" min="0" max="2050" value="0" step="1" aria-label="Synchronized recording and stimulus timeline">
+            <div class="time-row"><span><strong id="sessionTime">00:00.0</strong></span><span id="durationLabel">—</span></div>
+            <div id="timelineCursorSlider" class="timeline-cursor slider-cursor" aria-hidden="true"></div>
+          </div>
           <div class="track-label">Stimulus video</div>
-          <div id="stimulusTrack" class="stimulus-track" aria-label="Stimulus video and recognized events"></div>
+          <div id="stimulusTrack" class="stimulus-track" aria-label="Full 4 minute 19 second stimulus video and recognized events"><div id="timelineCursorStimulus" class="timeline-cursor" aria-hidden="true"></div></div>
           <div class="track-label">Participant data</div>
-          <div id="coverageTrack" class="coverage-track"><div id="participantCoverage" class="participant-coverage"></div></div>
+          <div id="coverageTrack" class="coverage-track"><div id="participantCoverage" class="participant-coverage"></div><div id="timelineCursorCoverage" class="timeline-cursor" aria-hidden="true"></div></div>
         </div>
-        <div id="coverageText" class="coverage-text">—</div>
+        <div class="timeline-meta-row"><strong>Full stimulus video · 04:19.0</strong><span id="coverageText">—</span></div>
       </div>
 
       <div class="stage-wrap">
@@ -108,12 +104,12 @@
           <button data-nudge="0.1">+0.1</button>
           <button data-nudge="1">+1 s</button>
         </div>
-        <button id="autoSync" class="primary" type="button">Sync from door gaze</button>
+        <button id="autoSync" class="primary" type="button">Sync from door fixation</button>
         <div class="sync-readout">
           <span>Video <strong id="syncStimulusTime">—</strong></span>
           <span>Recording <strong id="recordingTime">—</strong></span>
         </div>
-        <p id="syncMessage" class="muted small">Auto-sync uses the first sustained gaze response to the opening door as the primary anchor, then checks later stimulus AOIs as validation.</p>
+        <p id="syncMessage" class="muted small">Auto-sync uses a fixation on the opening door as the primary anchor. The current offset provides a coarse location so incidental pre-video looks at the door are not selected; later stimulus AOIs are used as validation.</p>
       </section>
 
       <section class="panel">
@@ -149,6 +145,8 @@
     </aside>
   </main>
 
-  <script src="app.js?v=8"></script>
+  <footer class="site-footer" aria-hidden="true"></footer>
+
+  <script src="app.js?v=9"></script>
 </body>
 </html>
