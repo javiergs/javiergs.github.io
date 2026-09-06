@@ -16,6 +16,9 @@
   let sessionDuration=0;
   let currentGazeIndex=-1, currentParticipant="P12";
   const PARTICIPANTS={P12:{gaze:"data/P12-gaze.csv",fixations:"data/P12-fixations.csv"},P03:{gaze:"data/P03-gaze.csv",fixations:"data/P03-fixations.csv"}};
+  let gazeTimes=[];
+  let eventPrefix=new Map();
+  let syncRunToken=0;
 
   const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
   const fmt=s=>{s=Math.max(0,Number(s)||0);const m=Math.floor(s/60),ss=s-m*60;return `${String(m).padStart(2,"0")}:${ss.toFixed(1).padStart(4,"0")}`};
@@ -283,97 +286,128 @@
     updateCoverage();
   }
 
-  function scoreOffset(offset,detail=false){
-    // General participant-independent validation. Each known stimulus zone is projected
-    // onto the participant recording; evidence may occur anywhere in the active zone
-    // plus a short human-response tail. Missing a zone is neutral rather than fatal.
+  function lowerBoundTime(t){
+    let lo=0,hi=gazeTimes.length;
+    while(lo<hi){const m=(lo+hi)>>1;if(gazeTimes[m]<t)lo=m+1;else hi=m;}
+    return lo;
+  }
+  function rangeCount(prefix,a,b){
+    if(!prefix||b<=a)return 0;
+    const i0=lowerBoundTime(a), i1=lowerBoundTime(b);
+    return prefix[i1]-prefix[i0];
+  }
+  function rangeTotal(a,b){
+    if(b<=a)return 0;
+    return Math.max(0,lowerBoundTime(b)-lowerBoundTime(a));
+  }
+  function buildSyncIndex(){
+    gazeTimes=gaze.map(r=>r.deviceTimestamp-recordingZero);
+    eventPrefix=new Map();
+    for(const e of stimuli.events.filter(e=>e.id!=="combined")){
+      const pref=new Uint32Array(gaze.length+1);
+      for(let i=0;i<gaze.length;i++){
+        const r=gaze[i];
+        const inside=r.confidence>=.55 && eventContains(e,mapSurface(r.surfaceX,r.surfaceY));
+        pref[i+1]=pref[i]+(inside?1:0);
+      }
+      eventPrefix.set(e.id,pref);
+    }
+  }
+  function scoreOffset(offset){
+    // Fast, participant-independent validation using precomputed AOI prefix counts.
     let weighted=0,possible=0,hits=0,used=0;
     const matches=[];
     for(const e of stimuli.events.filter(e=>e.id!=="combined")){
       const w=e.weight||1, startRec=e.start+offset, endRec=e.end+offset;
       if(endRec<recordingStartSec || startRec>recordingEndSec)continue;
       used++; possible+=w;
-      const preStart=startRec-1.5, responseEnd=Math.min(recordingEndSec,endRec+2.0);
-      let i=nearestGazeIndex(preStart),insideActive=0,totalActive=0,insidePre=0,totalPre=0,firstInside=null;
-      while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>preStart)i--;
-      for(;i<gaze.length;i++){
-        const r=gaze[i],rt=r.deviceTimestamp-recordingZero;if(rt>responseEnd)break;
-        if(rt<preStart||r.confidence<.55)continue;
-        const inside=eventContains(e,mapSurface(r.surfaceX,r.surfaceY));
-        if(rt<startRec){totalPre++;if(inside)insidePre++;}
-        else {totalActive++;if(inside){insideActive++;if(firstInside===null)firstInside=rt;}}
-      }
+      const preStart=Math.max(recordingStartSec,startRec-1.5);
+      const responseEnd=Math.min(recordingEndSec,endRec+2.0);
+      const pref=eventPrefix.get(e.id);
+      const insidePre=rangeCount(pref,preStart,startRec), totalPre=rangeTotal(preStart,startRec);
+      const insideActive=rangeCount(pref,startRec,responseEnd), totalActive=rangeTotal(startRec,responseEnd);
       if(!totalActive)continue;
       const activeRatio=insideActive/totalActive, preRatio=totalPre?insidePre/totalPre:0;
-      // Reward a meaningful increase/occupancy in the AOI, but allow sustained attention
-      // that began just before the nominal boundary because event boundaries are approximate.
       const contrast=Math.max(0,activeRatio-preRatio*.45);
       const occupancy=Math.min(1,activeRatio/.12);
-      let s=.60*occupancy+.40*Math.min(1,contrast/.10);
-      if(insideActive>=4 && activeRatio>=.035){weighted+=w*s;hits++;matches.push({event:e,score:s,ratio:activeRatio,firstInside});}
+      const s=.60*occupancy+.40*Math.min(1,contrast/.10);
+      if(insideActive>=4 && activeRatio>=.035){weighted+=w*s;hits++;matches.push({event:e,score:s,ratio:activeRatio});}
     }
-    // Coverage matters, but an unseen stimulus is not treated as contradictory evidence.
     const agreement=possible?weighted/possible:0;
     const support=used?hits/used:0;
     return {score:.78*agreement+.22*support,hits,used,offset,matches};
   }
   function fixationCandidatesForEvent(event){
     const minConf=Math.max(.55,+minConfidence.value||0), out=[];
+    const pref=eventPrefix.get(event.id);
+    if(!pref)return out;
     for(const f of fixations){
       if(f.durationMs<80 || f.confidence<minConf)continue;
       const startSec=f.start-recordingZero, endSec=startSec+f.durationMs/1000;
       if(endSec<recordingStartSec || startSec>recordingEndSec)continue;
-      let i=nearestGazeIndex(startSec),inside=0,total=0;
-      while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>startSec)i--;
-      for(;i<gaze.length;i++){
-        const r=gaze[i],rt=r.deviceTimestamp-recordingZero;if(rt>endSec)break;
-        if(rt<startSec||r.confidence<minConf)continue;
-        total++;if(eventContains(event,mapSurface(r.surfaceX,r.surfaceY)))inside++;
-      }
+      const total=rangeTotal(startSec,endSec);
       if(total<4)continue;
-      const ratio=inside/total;
+      const inside=rangeCount(pref,startSec,endSec), ratio=inside/total;
       if(ratio>=.55)out.push({event,fixation:f,recordingTime:startSec,ratio});
     }
-    return out;
+    // Keep only the strongest candidates per zone. This prevents one frequently viewed AOI
+    // from producing thousands of redundant offset hypotheses.
+    out.sort((a,b)=>(b.ratio*Math.min(1,b.fixation.durationMs/250))-(a.ratio*Math.min(1,a.fixation.durationMs/250)));
+    return out.slice(0,40);
   }
-  function findBestSyncAnchor(){
+  function buildSyncCandidates(){
     const candidates=[];
-    for(const event of stimuli.events){
+    for(const event of stimuli.events.filter(e=>e.id!=="combined")){
       for(const c of fixationCandidatesForEvent(event)){
-        // A fixation may follow event onset. Generate several plausible response latencies
-        // instead of assuming every fixation starts exactly at the stimulus boundary.
-        const latencies=[0,.5,1.0,1.75,2.5];
-        for(const latency of latencies){
+        for(const latency of [0,.5,1.0,1.75,2.5]){
           const offset=c.recordingTime-event.start-latency;
           if(offset<recordingStartSec-stimuli.duration || offset>recordingEndSec)continue;
-          const validation=scoreOffset(offset);
-          const fixationQuality=c.ratio*Math.min(1,c.fixation.durationMs/220);
-          const distinctive=(event.syncAnchor?.045:0)+(event.id==="top-figure"?.02:0);
-          const combined=validation.score*.86+fixationQuality*.10+distinctive;
-          candidates.push({...c,offset,latency,validation,combined});
+          candidates.push({...c,offset,latency});
         }
       }
     }
-    if(!candidates.length)return null;
-    candidates.sort((a,b)=>b.combined-a.combined||b.validation.hits-a.validation.hits||b.ratio-a.ratio);
-    return candidates[0];
+    return candidates;
   }
-  function autoSync(){
+  async function findBestSyncAnchorAsync(token){
+    const candidates=buildSyncCandidates();
+    if(!candidates.length)return null;
+    let best=null;
+    const chunk=80;
+    for(let base=0;base<candidates.length;base+=chunk){
+      if(token!==syncRunToken)return null;
+      const stop=Math.min(candidates.length,base+chunk);
+      for(let i=base;i<stop;i++){
+        const c=candidates[i],validation=scoreOffset(c.offset);
+        const fixationQuality=c.ratio*Math.min(1,c.fixation.durationMs/220);
+        const distinctive=(c.event.syncAnchor?.045:0)+(c.event.id==="top-figure"?.02:0);
+        const combined=validation.score*.86+fixationQuality*.10+distinctive;
+        const item={...c,validation,combined};
+        if(!best || item.combined>best.combined || (item.combined===best.combined&&item.validation.hits>best.validation.hits))best=item;
+      }
+      // Yield to the browser so the slider, display toggles, and participant menu remain responsive.
+      await new Promise(requestAnimationFrame);
+    }
+    return best;
+  }
+  async function autoSync(){
+    const token=++syncRunToken;
     const btn=$("autoSync");btn.disabled=true;btn.textContent="Testing stimulus zones…";
-    $("syncMessage").textContent="Generating candidate offsets from fixation responses in all eight known AOIs, then selecting the offset with the strongest cross-zone agreement. No participant-specific offset is used.";
-    setTimeout(()=>{
-      const anchor=findBestSyncAnchor();
+    $("syncMessage").textContent="Testing candidate offsets from all known stimulus AOIs. The dashboard remains interactive while synchronization is scored.";
+    try{
+      const anchor=await findBestSyncAnchorAsync(token);
+      if(token!==syncRunToken)return;
       if(!anchor){
         $("syncMessage").textContent="No qualifying multi-zone alignment was found. The offset can still be adjusted manually.";
-        btn.disabled=false;btn.textContent="Auto-sync from stimulus zones";return;
+        return;
       }
       syncOffsetInput.value=anchor.offset.toFixed(2);
       updateQuality(anchor.validation);renderStimulusTrack();renderAt(sessionTime);
       const zone=stimuli.events.indexOf(anchor.event)+1;
       const supported=anchor.validation.matches.map(m=>stimuli.events.indexOf(m.event)+1).join(", ")||"none";
       $("syncMessage").textContent=`Best candidate: Zone ${zone} (${anchor.event.label}), fixation #${anchor.fixation.id} at participant ${fmt(anchor.recordingTime)}. Estimated stimulus-video start: participant ${fmt(anchor.offset)}. Supporting zones: ${supported} (${anchor.validation.hits}/${anchor.validation.used}); anchor AOI coverage ${(anchor.ratio*100).toFixed(0)}%.`;
-      btn.disabled=false;btn.textContent="Auto-sync from stimulus zones";
-    },30);
+    } finally {
+      if(token===syncRunToken){btn.disabled=false;btn.textContent="Auto-sync from stimulus zones";}
+    }
   }
   function updateQuality(s=scoreOffset(+syncOffsetInput.value||0)){
     const q=$("syncQuality");q.className="quality";let label="Weak";if(s.score>=.55&&s.hits>=4){label="Strong";q.classList.add("good")}else if(s.score>=.30&&s.hits>=2){label="Moderate";q.classList.add("mid")}else q.classList.add("weak");q.textContent=`${label} · ${(s.score*100).toFixed(0)}%`;
@@ -398,7 +432,7 @@
   window.addEventListener("resize",()=>renderHeatmap(sessionTime));
 
   async function loadParticipant(id, auto=true){
-    stop(); currentParticipant=id; status.textContent=`Loading ${id}…`;
+    stop(); syncRunToken++; currentParticipant=id; status.textContent=`Loading ${id}…`;
     const cfg=PARTICIPANTS[id]; if(!cfg){status.textContent=`No data configured for ${id}`;return;}
     try{
       const [g,f]=await Promise.all([fetch(cfg.gaze).then(r=>{if(!r.ok)throw Error(cfg.gaze);return r.text()}),fetch(cfg.fixations).then(r=>{if(!r.ok)throw Error(cfg.fixations);return r.text()})]);
@@ -408,9 +442,10 @@
       recordingStartSec=0;
       recordingEndSec=gaze.length?gaze[gaze.length-1].deviceTimestamp-recordingZero:0;
       sessionTime=0; syncOffsetInput.value="0.00";
+      buildSyncIndex();
       renderStimulusTrack();renderAt(0);updateQuality();updateCoverage();
       status.textContent=`${id} · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · ${stimuli.events.length} recognized stimulus events · gaze coverage ${fmt(recordingEndSec)}`;
-      if(auto)autoSync();
+      if(auto)setTimeout(()=>{ if(currentParticipant===id) autoSync(); },120);
     }catch(err){console.error(err);status.textContent=`Could not load ${id} participant data`;}
   }
 
