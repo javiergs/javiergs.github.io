@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Heart Castle Facade Study Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
   <header class="site-header">
@@ -25,7 +25,7 @@
       <div class="viewer-toolbar">
         <div class="toolbar-group">
           <label>Participant
-            <select id="participant"><option value="P03">P03</option></select>
+            <select id="participant"><option value="P12" selected>P12</option><option value="P03">P03</option></select>
           </label>
           <label>Facade view
             <select id="facadeView">
@@ -102,7 +102,7 @@
         </div>
         <p class="muted small">The slider spans the complete synchronized session. Offset = recording time − stimulus-video time.</p>
         <label class="field">Recording offset (s)
-          <input id="syncOffset" type="number" value="16.45" step="0.01">
+          <input id="syncOffset" type="number" value="0.00" step="0.01">
         </label>
         <div class="nudge-row">
           <button data-nudge="-1">−1 s</button>
@@ -110,12 +110,12 @@
           <button data-nudge="0.1">+0.1</button>
           <button data-nudge="1">+1 s</button>
         </div>
-        <button id="autoSync" class="primary" type="button">Sync from door fixation</button>
+        <button id="autoSync" class="primary" type="button">Auto-sync from stimulus zones</button>
         <div class="sync-readout">
           <span>Video <strong id="syncStimulusTime">—</strong></span>
           <span>Recording <strong id="recordingTime">—</strong></span>
         </div>
-        <p id="syncMessage" class="muted small">Auto-sync uses a fixation on the opening door as the primary anchor, then tests Zones 2–8 as independent behavioral evidence for the alignment.</p>
+        <p id="syncMessage" class="muted small">Auto-sync tests fixation responses against all eight known stimulus zones. Door opening is preferred when available; other zones can anchor the alignment when the door response is missing.</p>
       </section>
 
       <section class="panel">

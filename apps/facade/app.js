@@ -14,7 +14,8 @@
   let gaze=[], fixations=[], stimuli={duration:259,events:[]};
   let recordingZero=0, recordingStartSec=0, recordingEndSec=0, sessionTime=0, playing=false, raf=0, lastAnimation=0;
   let sessionDuration=0;
-  let currentGazeIndex=-1;
+  let currentGazeIndex=-1, currentParticipant="P12";
+  const PARTICIPANTS={P12:{gaze:"data/P12-gaze.csv",fixations:"data/P12-fixations.csv"},P03:{gaze:"data/P03-gaze.csv",fixations:"data/P03-fixations.csv"}};
 
   const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
   const fmt=s=>{s=Math.max(0,Number(s)||0);const m=Math.floor(s/60),ss=s-m*60;return `${String(m).padStart(2,"0")}:${ss.toFixed(1).padStart(4,"0")}`};
@@ -285,64 +286,59 @@
     }
     return {score:max?weighted/max:0,hits,used,offset};
   }
-  function fixationDoorCandidates(){
-    const door=stimuli.events.find(e=>e.syncAnchor)||stimuli.events.find(e=>e.id==="door-open");
-    if(!door)return [];
-    const minConf=Math.max(.55,+minConfidence.value||0);
-    const out=[];
+  function fixationCandidatesForEvent(event){
+    const minConf=Math.max(.55,+minConfidence.value||0), out=[];
     for(const f of fixations){
       if(f.durationMs<80 || f.confidence<minConf)continue;
       const startSec=f.start-recordingZero, endSec=startSec+f.durationMs/1000;
-      let i=nearestGazeIndex(startSec),inside=0,total=0,sumX=0,sumY=0;
+      if(endSec<recordingStartSec || startSec>recordingEndSec)continue;
+      let i=nearestGazeIndex(startSec),inside=0,total=0;
       while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>startSec)i--;
       for(;i<gaze.length;i++){
         const r=gaze[i],rt=r.deviceTimestamp-recordingZero;
         if(rt>endSec)break;
         if(rt<startSec||r.confidence<minConf)continue;
-        const p=mapSurface(r.surfaceX,r.surfaceY); total++; sumX+=p.x; sumY+=p.y;
-        if(eventContains(door,p))inside++;
+        total++; if(eventContains(event,mapSurface(r.surfaceX,r.surfaceY)))inside++;
       }
       if(total<4)continue;
       const ratio=inside/total;
-      if(ratio>=.60)out.push({fixation:f,recordingTime:startSec,ratio,meanX:sumX/total,meanY:sumY/total});
+      if(ratio>=.60)out.push({event,fixation:f,recordingTime:startSec,ratio});
     }
     return out;
   }
-  function findDoorFixationAnchor(){
-    const door=stimuli.events.find(e=>e.syncAnchor)||stimuli.events.find(e=>e.id==="door-open");
-    if(!door)return null;
-    let candidates=fixationDoorCandidates().filter(c=>c.recordingTime<=90);
+  function findBestSyncAnchor(){
+    let candidates=[];
+    for(const event of stimuli.events){
+      for(const c of fixationCandidatesForEvent(event)){
+        const offset=c.recordingTime-event.start;
+        // The full 4:19 stimulus should normally sit mostly inside the gaze recording.
+        // Keep broad bounds so participants with missing lead-in/tail data still work.
+        if(offset < recordingStartSec-stimuli.duration || offset > recordingEndSec)continue;
+        const validation=scoreOffset(offset);
+        const fixationQuality=c.ratio*Math.min(1,c.fixation.durationMs/180);
+        const doorBonus=event.syncAnchor?.10:0;
+        const combined=validation.score*.74 + fixationQuality*.16 + doorBonus;
+        candidates.push({...c,offset,validation,combined});
+      }
+    }
     if(!candidates.length)return null;
-
-    // The door gives the primary behavioral anchor.  We then test each plausible
-    // door fixation against Zones 2–8 and choose the alignment with the strongest
-    // overall agreement.  This avoids locking onto an incidental early look at the door.
-    candidates=candidates.map(c=>{
-      const offset=c.recordingTime-door.start;
-      const validation=scoreOffset(offset);
-      const doorQuality=c.ratio*Math.min(1,c.fixation.durationMs/180);
-      const combined=validation.score*.72 + doorQuality*.28;
-      return {...c,offset,validation,combined};
-    });
-    candidates.sort((a,b)=>b.combined-a.combined || b.validation.hits-a.validation.hits || a.recordingTime-b.recordingTime);
-    const c=candidates[0];
-    return {recordingTime:c.recordingTime,stimulusTime:door.start,offset:c.offset,event:door,fixation:c.fixation,ratio:c.ratio,validation:c.validation};
+    candidates.sort((a,b)=>b.combined-a.combined || b.validation.hits-a.validation.hits || (b.event.syncAnchor?1:0)-(a.event.syncAnchor?1:0));
+    return candidates[0];
   }
-
   function autoSync(){
-    const btn=$("autoSync");btn.disabled=true;btn.textContent="Finding door fixation…";
-    $("syncMessage").textContent="Testing early door fixations and validating each candidate against Zones 2–8…";
+    const btn=$("autoSync");btn.disabled=true;btn.textContent="Testing stimulus zones…";
+    $("syncMessage").textContent="Testing fixation responses against Zones 1–8. Door opening has priority, while later zones can provide or confirm the alignment.";
     setTimeout(()=>{
-      const anchor=findDoorFixationAnchor();
+      const anchor=findBestSyncAnchor();
       if(!anchor){
-        $("syncMessage").textContent="No qualifying early fixation on the door was found. The offset can still be adjusted manually.";
-        btn.disabled=false;btn.textContent="Sync from door fixation";return;
+        $("syncMessage").textContent="No qualifying fixation-to-stimulus alignment was found. The offset can still be adjusted manually.";
+        btn.disabled=false;btn.textContent="Auto-sync from stimulus zones";return;
       }
       syncOffsetInput.value=anchor.offset.toFixed(2);
-      const validation=anchor.validation||scoreOffset(anchor.offset);
-      updateQuality(validation);renderStimulusTrack();renderAt(sessionTime);
-      $("syncMessage").textContent=`Door fixation #${anchor.fixation.id} at recording ${fmt(anchor.recordingTime)} is aligned to door opening at video ${fmt(anchor.stimulusTime)}. Estimated video start: ${fmt(anchor.offset)} into the participant recording. Door-AOI coverage during the fixation: ${(anchor.ratio*100).toFixed(0)}%. Later AOIs provide a validation score (${validation.hits}/${validation.used}).`;
-      btn.disabled=false;btn.textContent="Sync from door fixation";
+      updateQuality(anchor.validation);renderStimulusTrack();renderAt(sessionTime);
+      const zone=stimuli.events.indexOf(anchor.event)+1;
+      $("syncMessage").textContent=`Best anchor: Zone ${zone} (${anchor.event.label}), fixation #${anchor.fixation.id} at participant ${fmt(anchor.recordingTime)}. This places stimulus video 0:00 at participant ${fmt(anchor.offset)}. AOI coverage ${(anchor.ratio*100).toFixed(0)}%; cross-zone confirmation ${anchor.validation.hits}/${anchor.validation.used}.`;
+      btn.disabled=false;btn.textContent="Auto-sync from stimulus zones";
     },30);
   }
   function updateQuality(s=scoreOffset(+syncOffsetInput.value||0)){
@@ -362,28 +358,32 @@
   Object.values(markerEls).forEach(el=>el.addEventListener("pointerdown",e=>beginDrag(el,e)));
   $("resetSurface").addEventListener("click",()=>{markers=structuredClone(DEFAULT_MARKERS);renderMarkers();updateQuality();renderAt(sessionTime)});
   $("exportConfig").addEventListener("click",()=>{
-    const data={participant:"P03",syncOffsetSeconds:+syncOffsetInput.value,surfaceMarkersPercent:markers,stimulusFile:"data/stimuli.json",note:"Offset is recording time minus stimulus-video time; the dashboard timeline spans all synchronized recording and stimulus data."};
-    const a=document.createElement("a"),blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});a.href=URL.createObjectURL(blob);a.download="P03-sync-config.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
+    const data={participant:currentParticipant,syncOffsetSeconds:+syncOffsetInput.value,surfaceMarkersPercent:markers,stimulusFile:"data/stimuli.json",note:"Offset is recording time minus stimulus-video time; the dashboard timeline spans all synchronized recording and stimulus data."};
+    const a=document.createElement("a"),blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});a.href=URL.createObjectURL(blob);a.download=`${currentParticipant}-sync-config.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
   });
   window.addEventListener("resize",()=>renderHeatmap(sessionTime));
 
+  async function loadParticipant(id, auto=true){
+    stop(); currentParticipant=id; status.textContent=`Loading ${id}…`;
+    const cfg=PARTICIPANTS[id]; if(!cfg){status.textContent=`No data configured for ${id}`;return;}
+    try{
+      const [g,f]=await Promise.all([fetch(cfg.gaze).then(r=>{if(!r.ok)throw Error(cfg.gaze);return r.text()}),fetch(cfg.fixations).then(r=>{if(!r.ok)throw Error(cfg.fixations);return r.text()})]);
+      gaze=parseGaze(g);fixations=parseFixations(f);
+      // Gaze is the primary coverage stream. Fixations are behavioral events layered on it.
+      recordingZero=gaze.length?gaze[0].deviceTimestamp:(fixations.length?fixations[0].start:0);
+      recordingStartSec=0;
+      recordingEndSec=gaze.length?gaze[gaze.length-1].deviceTimestamp-recordingZero:0;
+      sessionTime=0; syncOffsetInput.value="0.00";
+      renderStimulusTrack();renderAt(0);updateQuality();updateCoverage();
+      status.textContent=`${id} · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · ${stimuli.events.length} recognized stimulus events · gaze coverage ${fmt(recordingEndSec)}`;
+      if(auto)autoSync();
+    }catch(err){console.error(err);status.textContent=`Could not load ${id} participant data`;}
+  }
+
   renderMarkerInputs();
-  Promise.all([
-    fetch("data/P03-gaze.csv").then(r=>r.text()),
-    fetch("data/P03-fixations.csv").then(r=>r.text()),
-    fetch("data/stimuli.json").then(r=>r.json())
-  ]).then(([g,f,s])=>{
-    gaze=parseGaze(g);fixations=parseFixations(f);stimuli=s;
-    recordingZero=fixations.length?fixations[0].start:(gaze.length?gaze[0].deviceTimestamp:0);
-    const gazeStart=gaze.length?gaze[0].deviceTimestamp-recordingZero:0;
-    const gazeEnd=gaze.length?gaze[gaze.length-1].deviceTimestamp-recordingZero:0;
-    const fixStart=fixations.length?fixations[0].start-recordingZero:gazeStart;
-    const fixEnd=fixations.length?Math.max(...fixations.map(x=>x.start+x.durationMs/1000))-recordingZero:gazeEnd;
-    recordingStartSec=Math.min(gazeStart,fixStart,0);
-    recordingEndSec=Math.max(gazeEnd,fixEnd);
-    const recDuration=recordingEndSec-recordingStartSec;
-    renderStimulusTrack();
-    status.textContent=`P03 · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length} fixations · ${stimuli.events.length} recognized stimulus events · recording ${fmt(recDuration)}`;
-    stage.classList.toggle("show-surface",showSurface.checked);renderAt(0);updateQuality();updateCoverage();
-  }).catch(err=>{console.error(err);status.textContent="Could not load participant data";});
+  fetch("data/stimuli.json").then(r=>r.json()).then(s=>{
+    stimuli=s;
+    $("participant").addEventListener("change",e=>loadParticipant(e.target.value,true));
+    return loadParticipant($("participant").value,true);
+  }).catch(err=>{console.error(err);status.textContent="Could not load stimulus configuration";});
 })();

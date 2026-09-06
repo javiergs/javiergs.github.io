@@ -1,13 +1,19 @@
-# Heart Castle Facade Study Dashboard v10
+# Heart Castle Facade Study Dashboard v11
 
-Static web dashboard for synchronized visual-stimulus, gaze, fixation, and later affective data.
+Static dashboard prototype for synchronizing the fixed 4:19 visual-stimulus sequence with participant-specific gaze and fixation recordings.
 
-## v10 changes
-- Uses representative frames from the actual stimulus sequence: baseline plus Zones 1–8.
-- `Actual stimulus` view reproduces the corresponding stimulus state; wait periods use a neutral baseline frame.
-- `Analysis (desaturated)` uses a grayscale baseline with the AOI overlay, useful for gaze and heatmap inspection.
-- Cumulative heatmap now uses a blue → cyan → green → yellow → red density scale rather than only yellow/orange.
-- Door synchronization evaluates early door fixations and validates candidate offsets against Zones 2–8.
-- Full session slider still spans all participant/stimulus data, while the stimulus video remains fixed at 4:19.
+## Participants included
+- P12 (default)
+- P03
 
-Run from this directory with a local static server, e.g. `python3 -m http.server 8000`.
+The participant selector reloads each participant's native gaze/fixation files and recalculates coverage and synchronization. Gaze timestamps define the participant-data coverage bar; fixation events are used as behavioral synchronization evidence.
+
+## Synchronization
+The 4:19 stimulus sequence is constant. Auto-sync searches fixation responses against all eight known stimulus AOIs. Zone 1 (door opening) receives priority when available, but any zone may provide an anchor. Each candidate offset is validated against the remaining stimulus zones and the best cross-zone match is selected. The offset can still be nudged manually.
+
+## Run
+From this folder:
+
+    python3 -m http.server 8000
+
+Open http://localhost:8000/
