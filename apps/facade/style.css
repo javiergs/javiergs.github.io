@@ -228,3 +228,59 @@ body {
   font-variant-numeric:tabular-nums;
   font-size:10px;
 }
+
+/* v8: unified session timeline. The participant recording can begin before the 4:19 stimulus video. */
+.stimulus-legend { display:none !important; }
+.timeline-track-stack {
+  display:grid;
+  grid-template-columns:92px minmax(0,1fr);
+  gap:6px 10px;
+  align-items:center;
+  margin:5px 0 0;
+}
+.track-label {
+  color:var(--muted);
+  font-size:10px;
+  font-weight:700;
+  text-align:right;
+  white-space:nowrap;
+}
+.timeline-track-stack .stimulus-track,
+.timeline-track-stack .coverage-track {
+  margin:0 !important;
+  width:100%;
+}
+.stimulus-track {
+  height:46px;
+  position:relative;
+  overflow:hidden;
+  background:#f2f4f3;
+}
+.video-window {
+  position:absolute;
+  top:0;
+  bottom:0;
+  background:rgba(127,156,143,.10);
+  border-left:2px solid rgba(25,62,44,.45);
+  border-right:2px solid rgba(25,62,44,.45);
+  pointer-events:none;
+}
+.stimulus-segment {
+  min-width:0 !important;
+  box-sizing:border-box;
+}
+.coverage-track {
+  height:10px;
+  background:#e5e9e6;
+}
+.coverage-text {
+  margin:5px 0 0 102px;
+  color:var(--muted);
+  font-size:10px;
+  font-variant-numeric:tabular-nums;
+}
+@media(max-width:760px){
+  .timeline-track-stack{grid-template-columns:1fr;gap:3px}
+  .track-label{text-align:left}
+  .coverage-text{margin-left:0}
+}

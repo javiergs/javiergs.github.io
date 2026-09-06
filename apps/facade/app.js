@@ -12,7 +12,8 @@
   const markerEls = {tl:$("markerTL"),tr:$("markerTR"),bl:$("markerBL"),br:$("markerBR")};
 
   let gaze=[], fixations=[], stimuli={duration:259,events:[]};
-  let recordingZero=0, recordingStartSec=0, recordingEndSec=0, stimulusTime=0, playing=false, raf=0, lastAnimation=0;
+  let recordingZero=0, recordingStartSec=0, recordingEndSec=0, sessionTime=0, playing=false, raf=0, lastAnimation=0;
+  let sessionDuration=0;
   let currentGazeIndex=-1;
 
   const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -75,16 +76,18 @@
     for(const k of ["tl","tr","bl","br"]){
       const row=document.createElement("div");row.className="marker-row";row.innerHTML=`<strong>${k.toUpperCase()}</strong><label>X %<input type="number" data-k="${k}" data-axis="x" step="0.1"></label><label>Y %<input type="number" data-k="${k}" data-axis="y" step="0.1"></label>`;box.appendChild(row);
     }
-    box.querySelectorAll("input").forEach(i=>i.addEventListener("input",()=>{const n=+i.value;if(Number.isFinite(n)){markers[i.dataset.k][i.dataset.axis]=clamp(n,0,100);renderMarkers();renderAt(stimulusTime);}}));
+    box.querySelectorAll("input").forEach(i=>i.addEventListener("input",()=>{const n=+i.value;if(Number.isFinite(n)){markers[i.dataset.k][i.dataset.axis]=clamp(n,0,100);renderMarkers();renderAt(sessionTime);}}));
     renderMarkers();
   }
   function beginDrag(el,ev){
     ev.preventDefault(); const k=el.dataset.marker; el.setPointerCapture(ev.pointerId);
-    const move=e=>{const r=stage.getBoundingClientRect();markers[k].x=clamp((e.clientX-r.left)/r.width*100,0,100);markers[k].y=clamp((e.clientY-r.top)/r.height*100,0,100);renderMarkers();renderAt(stimulusTime)};
+    const move=e=>{const r=stage.getBoundingClientRect();markers[k].x=clamp((e.clientX-r.left)/r.width*100,0,100);markers[k].y=clamp((e.clientY-r.top)/r.height*100,0,100);renderMarkers();renderAt(sessionTime)};
     const end=e=>{el.releasePointerCapture(e.pointerId);el.removeEventListener("pointermove",move);el.removeEventListener("pointerup",end);el.removeEventListener("pointercancel",end)};
     el.addEventListener("pointermove",move);el.addEventListener("pointerup",end);el.addEventListener("pointercancel",end);
   }
 
+  function videoStartOnSession(){ return +syncOffsetInput.value || 0; }
+  function videoTimeFromSession(t){ return t - videoStartOnSession(); }
   function activeEvent(t){return stimuli.events.find(e=>t>=e.start&&t<e.end)||null;}
   function shapeContains(shape,p){
     if(shape.type==="rect")return p.x>=shape.x&&p.x<=shape.x+shape.w&&p.y>=shape.y&&p.y<=shape.y+shape.h;
@@ -104,61 +107,56 @@
       el.setAttribute("class","aoi aoi-pulse");stimulusOverlay.appendChild(el);
     }
   }
-  function renderStimulusTrack(){
-    const track=$("stimulusTrack"), legend=$("stimulusLegend");
-    track.innerHTML=""; legend.innerHTML="";
+  function recomputeSessionDuration(){
+    const videoStart=videoStartOnSession();
+    sessionDuration=Math.max(recordingEndSec, videoStart+stimuli.duration, 0);
+    slider.max=Math.round(sessionDuration*10);
+    $("durationLabel").textContent=fmt(sessionDuration);
+  }
 
-    // Draw every neutral interval explicitly so the viewer sees the wait/baseline periods.
-    let cursor=0;
-    stimuli.events.forEach(e=>{
-      if(e.start>cursor){
-        const w=document.createElement("div");
-        w.className="wait-segment";
-        w.style.left=(cursor/stimuli.duration*100)+"%";
-        w.style.width=((e.start-cursor)/stimuli.duration*100)+"%";
-        w.title=`Wait / baseline: ${fmt(cursor)}–${fmt(e.start)}`;
-        track.appendChild(w);
-      }
-      cursor=Math.max(cursor,e.end);
-    });
-    if(cursor<stimuli.duration){
-      const w=document.createElement("div");w.className="wait-segment";w.style.left=(cursor/stimuli.duration*100)+"%";w.style.width=((stimuli.duration-cursor)/stimuli.duration*100)+"%";w.title=`Wait / baseline: ${fmt(cursor)}–${fmt(stimuli.duration)}`;track.appendChild(w);
-    }
+  function renderStimulusTrack(){
+    const track=$("stimulusTrack");
+    track.innerHTML="";
+    recomputeSessionDuration();
+    if(!sessionDuration)return;
+    const videoStart=videoStartOnSession();
+    const videoEnd=videoStart+stimuli.duration;
+
+    const window=document.createElement("div");
+    window.className="video-window";
+    window.style.left=(videoStart/sessionDuration*100)+"%";
+    window.style.width=(stimuli.duration/sessionDuration*100)+"%";
+    window.title=`Stimulus video: ${fmt(videoStart)}–${fmt(videoEnd)} on synchronized timeline`;
+    track.appendChild(window);
 
     stimuli.events.forEach((e,idx)=>{
       const n=idx+1,b=document.createElement("button");
       b.className="stimulus-segment"+(e.syncAnchor?" anchor":"");
       b.dataset.id=e.id;
-      b.title=`${n}. ${e.label}: ${fmt(e.start)}–${fmt(e.end)}${e.syncAnchor?" · primary synchronization anchor":""}`;
+      b.title=`${n}. ${e.label}: video ${fmt(e.start)}–${fmt(e.end)} · synchronized ${fmt(videoStart+e.start)}–${fmt(videoStart+e.end)}${e.syncAnchor?" · primary synchronization anchor":""}`;
       b.textContent=String(n);
-      b.style.left=(e.start/stimuli.duration*100)+"%";
-      b.style.width=((e.end-e.start)/stimuli.duration*100)+"%";
-      b.addEventListener("click",()=>{stop();renderAt(e.start)});
+      b.style.left=((videoStart+e.start)/sessionDuration*100)+"%";
+      b.style.width=((e.end-e.start)/sessionDuration*100)+"%";
+      b.addEventListener("click",()=>{stop();renderAt(videoStart+e.start)});
       track.appendChild(b);
-
-      const k=document.createElement("button");
-      k.innerHTML=`<strong>${n}.</strong> ${e.label}`;
-      k.dataset.time=`${fmt(e.start)}–${fmt(e.end)}`;
-      k.title=`Jump to ${fmt(e.start)}`;
-      k.addEventListener("click",()=>{stop();renderAt(e.start)});
-      legend.appendChild(k);
     });
     updateCoverage();
   }
 
   function updateCoverage(){
     const bar=$("participantCoverage"), txt=$("coverageText");
-    if(!bar||!txt||!stimuli.duration)return;
-    const off=+syncOffsetInput.value||0;
-    // recording time = stimulus time + offset, so coverage on stimulus clock is recording - offset.
-    const rawStart=recordingStartSec-off, rawEnd=recordingEndSec-off;
-    const start=clamp(rawStart,0,stimuli.duration), end=clamp(rawEnd,0,stimuli.duration);
-    bar.style.left=(start/stimuli.duration*100)+"%";
-    bar.style.width=(Math.max(0,end-start)/stimuli.duration*100)+"%";
-    const before=Math.max(0,-rawStart), after=Math.max(0,rawEnd-stimuli.duration);
-    const parts=[`${fmt(start)}–${fmt(end)}`];
-    if(before>0)parts.push(`${fmt(before)} recorder lead-in`);
-    if(after>0)parts.push(`${fmt(after)} recorder tail`);
+    if(!bar||!txt||!sessionDuration)return;
+    const start=Math.max(0,recordingStartSec), end=Math.max(start,recordingEndSec);
+    bar.style.left=(start/sessionDuration*100)+"%";
+    bar.style.width=((end-start)/sessionDuration*100)+"%";
+    const videoStart=videoStartOnSession(), videoEnd=videoStart+stimuli.duration;
+    const before=Math.max(0,videoStart-start);
+    const after=Math.max(0,end-videoEnd);
+    const missingTail=Math.max(0,videoEnd-end);
+    const parts=[`participant ${fmt(start)}–${fmt(end)}`, `video ${fmt(videoStart)}–${fmt(videoEnd)}`];
+    if(before>0)parts.push(`${fmt(before)} data before video`);
+    if(after>0)parts.push(`${fmt(after)} data after video`);
+    if(missingTail>0)parts.push(`${fmt(missingTail)} video after data ends`);
     txt.textContent=parts.join(" · ");
   }
 
@@ -187,14 +185,10 @@
     ensureCanvas(); clearHeatmap();
     heatmap.style.display = showHeatmap.checked ? "block" : "none";
     if(!showHeatmap.checked) return;
-    const off=+syncOffsetInput.value||0;
-    // Cumulative participant heatmap: deterministic at every slider position.
-    // Going backward rebuilds only the gaze accumulated up to that time.
-    // Accumulate only gaze that belongs to the synchronized stimulus timeline.
-    // At stimulus 00:00 the heatmap is empty, regardless of recorder lead-in.
-    const recStart=off;
-    const recEnd=t+off;
-    if(t<=0 || recEnd<=recStart) return;
+    // Cumulative participant heatmap across all recorded data available up to the current synchronized time.
+    const recStart=recordingStartSec;
+    const recEnd=Math.min(t,recordingEndSec);
+    if(recEnd<=recStart) return;
     let i=nearestGazeIndex(recStart);
     if(i<0)return;
     while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>recStart)i--;
@@ -210,15 +204,33 @@
   }
 
   function renderAt(t){
-    stimulusTime=clamp(t,0,stimuli.duration);slider.value=Math.round(stimulusTime*10);$("stimulusTime").textContent=fmt(stimulusTime);$("syncStimulusTime").textContent=fmt(stimulusTime);$("durationLabel").textContent=fmt(stimuli.duration);
-    const off=+syncOffsetInput.value||0,recTime=stimulusTime+off;$("recordingTime").textContent=fmt(recTime);
-    renderStimulus(stimulusTime);
-    const i=nearestGazeIndex(recTime);currentGazeIndex=i;
+    recomputeSessionDuration();
+    sessionTime=clamp(t,0,sessionDuration);
+    slider.value=Math.round(sessionTime*10);
+    $("sessionTime").textContent=fmt(sessionTime);
+    $("durationLabel").textContent=fmt(sessionDuration);
+
+    const videoStart=videoStartOnSession();
+    const videoTime=videoTimeFromSession(sessionTime);
+    const inVideo=videoTime>=0 && videoTime<=stimuli.duration;
+    $("syncStimulusTime").textContent=inVideo?fmt(videoTime):"—";
+    $("recordingTime").textContent=(sessionTime>=recordingStartSec&&sessionTime<=recordingEndSec)?fmt(sessionTime):"—";
+
+    renderStimulus(inVideo?videoTime:-1);
+    const recTime=sessionTime;
+    const hasRecording=recTime>=recordingStartSec && recTime<=recordingEndSec;
+    const i=hasRecording?nearestGazeIndex(recTime):-1; currentGazeIndex=i;
     const mode=overlayMode.value,showGaze=mode==="gaze";
-    if(i>=0){const r=gaze[i],recordingAtRow=r.deviceTimestamp-recordingZero,close=Math.abs(recordingAtRow-recTime)<0.20,hide=!showGaze||!close||!validGaze(r);const p=mapSurface(r.surfaceX,r.surfaceY);gazePoint.style.display=hide?"none":"block";gazePoint.style.left=p.x+"%";gazePoint.style.top=p.y+"%";$("sx").textContent=r.surfaceX.toFixed(4);$("sy").textContent=r.surfaceY.toFixed(4);$("confidence").textContent=r.confidence.toFixed(3);$("sampleIndex").textContent=`${i+1} / ${gaze.length}`;renderTrail(i)}
-    else{gazePoint.style.display="none";gazeTrail.innerHTML="";}
-    const f=currentFixation(recTime);$("fixationId").textContent=f?`#${f.id} · ${Math.round(f.durationMs)} ms`:"—";
-    renderHeatmap(stimulusTime);
+    if(i>=0){
+      const r=gaze[i],recordingAtRow=r.deviceTimestamp-recordingZero,close=Math.abs(recordingAtRow-recTime)<0.20,hide=!showGaze||!close||!validGaze(r);
+      const p=mapSurface(r.surfaceX,r.surfaceY);
+      gazePoint.style.display=hide?"none":"block";gazePoint.style.left=p.x+"%";gazePoint.style.top=p.y+"%";
+      $("sx").textContent=r.surfaceX.toFixed(4);$("sy").textContent=r.surfaceY.toFixed(4);$("confidence").textContent=r.confidence.toFixed(3);$("sampleIndex").textContent=`${i+1} / ${gaze.length}`;renderTrail(i);
+    } else {
+      gazePoint.style.display="none";gazeTrail.innerHTML="";$("sx").textContent="—";$("sy").textContent="—";$("confidence").textContent="—";$("sampleIndex").textContent="—";
+    }
+    const f=hasRecording?currentFixation(recTime):null;$("fixationId").textContent=f?`#${f.id} · ${Math.round(f.durationMs)} ms`:"—";
+    renderHeatmap(sessionTime);
     updateCoverage();
   }
 
@@ -275,7 +287,7 @@
       }
       syncOffsetInput.value=anchor.offset.toFixed(2);
       const validation=scoreOffset(anchor.offset);
-      updateQuality(validation);updateCoverage();renderAt(stimulusTime);
+      updateQuality(validation);renderStimulusTrack();renderAt(sessionTime);
       $("syncMessage").textContent=`Door gaze detected at recording ${fmt(anchor.recordingTime)} and aligned to door opening at stimulus ${fmt(anchor.stimulusTime)}. Estimated offset: ${anchor.offset.toFixed(2)} s. Later AOIs provide a validation score (${validation.hits}/${validation.used} responses).`;
       btn.disabled=false;btn.textContent="Sync from door gaze";
     },30);
@@ -290,14 +302,14 @@
 
   $("playPause").addEventListener("click",()=>playing?stop():play());
   slider.addEventListener("input",()=>{stop();renderAt(+slider.value/10)});
-  syncOffsetInput.addEventListener("input",()=>{updateQuality();renderAt(stimulusTime)});
+  syncOffsetInput.addEventListener("input",()=>{updateQuality();renderStimulusTrack();renderAt(sessionTime)});
   $("autoSync").addEventListener("click",autoSync);
-  document.querySelectorAll("[data-nudge]").forEach(b=>b.addEventListener("click",()=>{syncOffsetInput.value=(+syncOffsetInput.value + +b.dataset.nudge).toFixed(2);updateQuality();renderAt(stimulusTime)}));
-  [overlayMode,showTrail,showStimulus,showHeatmap,showSurface,confidenceFilter,minConfidence].forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(stimulusTime)}));
+  document.querySelectorAll("[data-nudge]").forEach(b=>b.addEventListener("click",()=>{syncOffsetInput.value=(+syncOffsetInput.value + +b.dataset.nudge).toFixed(2);updateQuality();renderStimulusTrack();renderAt(sessionTime)}));
+  [overlayMode,showTrail,showStimulus,showHeatmap,showSurface,confidenceFilter,minConfidence].forEach(el=>el.addEventListener("input",()=>{stage.classList.toggle("show-surface",showSurface.checked);renderAt(sessionTime)}));
   Object.values(markerEls).forEach(el=>el.addEventListener("pointerdown",e=>beginDrag(el,e)));
-  $("resetSurface").addEventListener("click",()=>{markers=structuredClone(DEFAULT_MARKERS);renderMarkers();updateQuality();renderAt(stimulusTime)});
+  $("resetSurface").addEventListener("click",()=>{markers=structuredClone(DEFAULT_MARKERS);renderMarkers();updateQuality();renderAt(sessionTime)});
   $("exportConfig").addEventListener("click",()=>{
-    const data={participant:"P03",syncOffsetSeconds:+syncOffsetInput.value,surfaceMarkersPercent:markers,stimulusFile:"data/stimuli.json",note:"Offset is recording time minus stimulus time."};
+    const data={participant:"P03",syncOffsetSeconds:+syncOffsetInput.value,surfaceMarkersPercent:markers,stimulusFile:"data/stimuli.json",note:"Offset is recording time minus stimulus-video time; the dashboard timeline spans all synchronized recording and stimulus data."};
     const a=document.createElement("a"),blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});a.href=URL.createObjectURL(blob);a.download="P03-sync-config.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
   });
   window.addEventListener("resize",()=>renderHeatmap(stimulusTime));
@@ -317,7 +329,7 @@
     recordingStartSec=Math.min(gazeStart,fixStart,0);
     recordingEndSec=Math.max(gazeEnd,fixEnd);
     const recDuration=recordingEndSec-recordingStartSec;
-    slider.max=Math.round(stimuli.duration*10);renderStimulusTrack();
+    renderStimulusTrack();
     status.textContent=`P03 · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length} fixations · ${stimuli.events.length} recognized stimulus events · recording ${fmt(recDuration)}`;
     stage.classList.toggle("show-surface",showSurface.checked);renderAt(0);updateQuality();updateCoverage();
   }).catch(err=>{console.error(err);status.textContent="Could not load participant data";});

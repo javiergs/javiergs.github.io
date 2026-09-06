@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Heart Castle Facade Study Dashboard</title>
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <header class="site-header">
@@ -44,10 +44,10 @@
         <div class="playback">
           <button id="playPause" class="play" type="button">▶</button>
           <div class="time-stack">
-            <input id="timeSlider" type="range" min="0" max="2050" value="0" step="1" aria-label="Study stimulus timeline">
+            <input id="timeSlider" type="range" min="0" max="2050" value="0" step="1" aria-label="Synchronized recording and stimulus timeline">
             <div class="time-row">
-              <span><strong id="stimulusTime">00:00.0</strong> stimulus</span>
-              <span id="durationLabel">03:25.0</span>
+              <span><strong id="sessionTime">00:00.0</strong> timeline</span>
+              <span id="durationLabel">—</span>
             </div>
           </div>
           <label>Speed
@@ -62,11 +62,15 @@
         </div>
         <div class="study-window-summary">
           <span><strong>Full stimulus video</strong> · 04:19.0</span>
-          <span class="study-window-note">Numbered blocks = recognized stimuli · gray blocks = wait / baseline.</span>
+          <span class="study-window-note">Numbered blocks = recognized stimuli · gray = wait / baseline · hover for details.</span>
         </div>
-        <div id="stimulusTrack" class="stimulus-track" aria-label="Stimulus events and wait periods"></div>
-        <div class="coverage-row"><span>Participant data</span><div id="coverageTrack" class="coverage-track"><div id="participantCoverage" class="participant-coverage"></div></div><span id="coverageText">—</span></div>
-        <div id="stimulusLegend" class="stimulus-legend" aria-label="Stimulus event legend"></div>
+        <div class="timeline-track-stack">
+          <div class="track-label">Stimulus video</div>
+          <div id="stimulusTrack" class="stimulus-track" aria-label="Stimulus video and recognized events"></div>
+          <div class="track-label">Participant data</div>
+          <div id="coverageTrack" class="coverage-track"><div id="participantCoverage" class="participant-coverage"></div></div>
+        </div>
+        <div id="coverageText" class="coverage-text">—</div>
       </div>
 
       <div class="stage-wrap">
@@ -94,7 +98,7 @@
           <h2>Synchronization</h2>
           <span id="syncQuality" class="quality">Not scored</span>
         </div>
-        <p class="muted small">Stimulus time is the master clock. Offset = recording time − stimulus time.</p>
+        <p class="muted small">The slider spans the complete synchronized session. Offset = recording time − stimulus-video time.</p>
         <label class="field">Recording offset (s)
           <input id="syncOffset" type="number" value="50.86" step="0.01">
         </label>
@@ -106,7 +110,7 @@
         </div>
         <button id="autoSync" class="primary" type="button">Sync from door gaze</button>
         <div class="sync-readout">
-          <span>Stimulus <strong id="syncStimulusTime">—</strong></span>
+          <span>Video <strong id="syncStimulusTime">—</strong></span>
           <span>Recording <strong id="recordingTime">—</strong></span>
         </div>
         <p id="syncMessage" class="muted small">Auto-sync uses the first sustained gaze response to the opening door as the primary anchor, then checks later stimulus AOIs as validation.</p>
@@ -145,6 +149,6 @@
     </aside>
   </main>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
