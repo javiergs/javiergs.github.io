@@ -14,11 +14,17 @@ The automatic synchronizer now includes a recording/stimulus overlap constraint.
 For P12 this rejects the erroneous late Zone 1 match and favors the early door-response family of candidates, while retaining the same general algorithm for future participants.
 
 
-## v17 heatmap update
+## v18 heatmap update
 The cumulative heatmap now accumulates density in a floating-point field rather than saturated canvas alpha. The visible scale allocates most values to blue/cyan/green/yellow, orange is reserved for high-density regions, and red is restricted to approximately the upper 0.3% of non-zero cumulative density.
 
 
-## v17
+## v18
 - Moves participant/recording metadata into a dedicated panel above Synchronization.
 - Uses the newly supplied 1280×853 baseline façade image as the neutral/baseline stimulus image and analysis reference.
 - Keeps the generalized multi-zone synchronization and selective cumulative heatmap from v16.
+
+
+## v18 adjustments
+- Surface mapping defaults updated to TL 6.7/3.6, TR 95.3/3.6, BL 6.0/94.9, BR 94.8/95.1. Reset Surface returns to these values.
+- Timeline stimulus blocks now use gold only for the currently active event. Hovering/clicking another block no longer leaves it looking active.
+- Heatmap uses a smaller spatial kernel and empirical density-rank coloring. True red is restricted to approximately the hottest 0.02% of visible density pixels.

@@ -6,7 +6,7 @@
   const showTrail = $("showTrail"), showStimulus = $("showStimulus"), showHeatmap = $("showHeatmap"), showSurface = $("showSurface"), confidenceFilter = $("confidenceFilter"), minConfidence = $("minConfidence");
 
   const DEFAULT_MARKERS = {
-    tl:{x:8.9,y:12.2}, tr:{x:89.3,y:12.2}, bl:{x:8.9,y:92.5}, br:{x:89.3,y:92.5}
+    tl:{x:6.7,y:3.6}, tr:{x:95.3,y:3.6}, bl:{x:6.0,y:94.9}, br:{x:94.8,y:95.1}
   };
   let markers = structuredClone(DEFAULT_MARKERS);
   const markerEls = {tl:$("markerTL"),tr:$("markerTR"),bl:$("markerBL"),br:$("markerBR")};
@@ -150,7 +150,7 @@
       b.textContent=String(n);
       b.style.left=((videoStart+e.start)/sessionDuration*100)+"%";
       b.style.width=((e.end-e.start)/sessionDuration*100)+"%";
-      b.addEventListener("click",()=>{stop();renderAt(videoStart+e.start)});
+      b.addEventListener("click",()=>{stop();renderAt(videoStart+e.start);b.blur();});
       track.appendChild(b);
     });
     updateCoverage();
@@ -224,6 +224,11 @@
     const x=clamp(p,0,1)*(sorted.length-1),lo=Math.floor(x),hi=Math.ceil(x),q=x-lo;
     return sorted[lo]*(1-q)+sorted[hi]*q;
   }
+  function upperBound(sorted,x){
+    let lo=0,hi=sorted.length;
+    while(lo<hi){const m=(lo+hi)>>1;if(sorted[m]<=x)lo=m+1;else hi=m;}
+    return lo;
+  }
   function renderHeatmap(t){
     ensureCanvas(); clearHeatmap();
     heatmap.style.display=showHeatmap.checked?"block":"none";
@@ -235,7 +240,7 @@
     // Canvas additive alpha saturates at 255 and was the reason large areas became red.
     const scale=.28, w=Math.max(120,Math.round(heatmap.width*scale)), h=Math.max(80,Math.round(heatmap.height*scale));
     const field=new Float32Array(w*h);
-    const radius=Math.max(9,Math.round(w*.022));
+    const radius=Math.max(7,Math.round(w*.015));
     const r2=radius*radius;
     let i=nearestGazeIndex(recStart), count=0; if(i<0)return;
     while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>recStart)i--;
@@ -261,32 +266,31 @@
     if(vals.length<8)return;
     vals.sort((a,b)=>a-b);
 
-    // Ignore the weakest fringe and use an extreme percentile as the upper reference.
-    // P99.7 maps near the beginning of orange/red; true red requires values at the
-    // very top of the cumulative density distribution.
-    const low=percentile(vals,.18);
-    const p95=percentile(vals,.95);
-    const p997=Math.max(p95+1e-6,percentile(vals,.997));
-    const max=vals[vals.length-1];
+    // Use the empirical density rank (CDF) rather than mapping broad high-density
+    // plateaus directly to the top of the color scale. This guarantees that red is
+    // reserved for only the rarest local maxima instead of large contiguous regions.
+    const visibleFloor=.10;
     const out=new ImageData(w,h);
     for(let idx=0;idx<field.length;idx++){
-      const a=field[idx]; if(a<=low)continue;
+      const a=field[idx]; if(a<=0)continue;
+      const rank=upperBound(vals,a)/vals.length;
+      if(rank<=visibleFloor)continue;
+
+      // Color allocation by density percentile:
+      // 10–70% blue/cyan, 70–90% green, 90–98% yellow,
+      // 98–99.8% orange, 99.8–99.98% red-orange,
+      // and only the hottest ~0.02% can become true red.
       let v;
-      if(a<=p95){
-        // 82% of the visible color range is used below the 95th percentile.
-        v=.82*clamp((a-low)/(p95-low||1),0,1);
-      }else if(a<=p997){
-        // P95..P99.7 moves from yellow toward orange, but not red.
-        v=.82+.14*clamp((a-p95)/(p997-p95||1),0,1);
-      }else{
-        // Only the upper ~0.3% can enter the red tail.
-        v=.96+.04*clamp((a-p997)/(max-p997||1),0,1);
-      }
-      // Slightly suppress the hot end again so broad high-density areas remain orange.
-      v=Math.pow(v,1.12);
+      if(rank<=.70) v=.00+.28*((rank-visibleFloor)/(.70-visibleFloor));
+      else if(rank<=.90) v=.28+.28*((rank-.70)/.20);
+      else if(rank<=.98) v=.56+.24*((rank-.90)/.08);
+      else if(rank<=.998) v=.80+.14*((rank-.98)/.018);
+      else if(rank<=.9998) v=.94+.052*((rank-.998)/.0018);
+      else v=.992+.008*((rank-.9998)/.0002);
+
       const c=heatColor(v),k=idx*4;
       out.data[k]=c[0];out.data[k+1]=c[1];out.data[k+2]=c[2];
-      out.data[k+3]=Math.round(22+190*Math.pow(v,.82));
+      out.data[k+3]=Math.round(18+185*Math.pow(v,.90));
     }
     const colored=document.createElement("canvas");colored.width=w;colored.height=h;colored.getContext("2d").putImageData(out,0,0);
     heatCtx.imageSmoothingEnabled=true;heatCtx.drawImage(colored,0,0,heatmap.width,heatmap.height);
