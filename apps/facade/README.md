@@ -1,18 +1,47 @@
-# Heart Castle Facade Study Dashboard — v32
+# Heart Castle Facade Study Dashboard — v33
 
-This version adds a **Combined (dominant)** affective gaze heatmap while preserving the existing single-affect heatmaps.
+This version makes participant management data-driven and makes participant changes reset the dashboard cleanly before loading the next recording.
 
-## Combined affective heatmap
-- Select **Combined (dominant)** from the Affect selector in the floating timeline controls.
-- The dashboard maintains a separate spatial field for every valid affective measure.
-- At each heatmap pixel, only the affect with the highest local mean response is shown.
-- Hue identifies the winning affect using the existing palette.
-- Tone reflects that affect's 0–1 magnitude.
-- Recency and repeated gaze/affect evidence reinforce opacity.
-- Older evidence remains visible as a lighter residual tone rather than disappearing.
-- **Minimum affect** is applied before samples contribute to any affective field.
-- Pixels remain transparent when no valid affect exceeds the selected threshold.
+## Participant menu
+The participant selector is now generated from:
 
-Single-affect mode continues to show only the selected affect using the same persistent-memory behavior introduced in v30.
+`data/participants.json`
+
+Example:
+
+```json
+[
+  "P12",
+  "P03",
+  "P15",
+  "P18"
+]
+```
+
+Each participant ID maps automatically to:
+
+- `data/<ID>/gaze.csv`
+- `data/<ID>/fixations.csv`
+- `data/<ID>/affect.txt` (optional)
+- `videos/<ID>.mov` (optional shared video folder)
+
+To add a participant, create the participant folder and add the ID to `participants.json`. No HTML or JavaScript menu editing is needed.
+
+## Clean participant switching
+Changing the participant now:
+
+- stops playback and cancels an in-progress auto-sync
+- clears gaze, fixation, affect, heatmap, trail, current-state, and zone-summary data
+- resets the master slider to zero
+- resets the synchronization offset
+- resets surface markers to the application defaults
+- resets/reloads the independent participant video
+- loads the newly selected participant and then runs auto-sync
+- uses a load token so a slower previous fetch cannot overwrite a participant selected afterward
+
+Missing `affect.txt` remains supported and is reported as unavailable rather than causing the participant load to fail.
+
+## Affective heatmaps
+The v32 single-affect and Combined (dominant) heatmaps are preserved, including minimum-affect filtering and persistent temporal fading/reinforcement.
 
 As in recent versions, `assets/` and `videos/` are intentionally not packaged because they are shared by the deployment.

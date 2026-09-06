@@ -15,8 +15,9 @@
   let gaze=[], fixations=[], affect=[], stimuli={duration:259,events:[]};
   let recordingZero=0, recordingStartSec=0, recordingEndSec=0, sessionTime=0, playing=false, raf=0, lastAnimation=0;
   let sessionDuration=0;
-  let currentGazeIndex=-1, currentParticipant="P12";
-  const PARTICIPANTS={P12:{gaze:"data/P12/gaze.csv",fixations:"data/P12/fixations.csv",affect:"data/P12/affect.txt"},P03:{gaze:"data/P03/gaze.csv",fixations:"data/P03/fixations.csv",affect:"data/P03/affect.txt"}};
+  let currentGazeIndex=-1, currentParticipant="";
+  let participantIds=[];
+  let participantLoadToken=0;
   const AFFECT_METRICS=["Focus","Engagement","Excitement","Interest","Relaxation","Stress"];
   const AFFECT_COLORS={Focus:"#4C1D95",Engagement:"#009E73",Excitement:"#E69F00",Interest:"#0072B2",Relaxation:"#CC79A7",Stress:"#D55E00"};
   let affectRecordingZeroLocal=0;
@@ -739,17 +740,74 @@
     video.load();
   }
 
-  async function loadParticipant(id, auto=true){
+  function participantConfig(id){
+    return {
+      gaze:`data/${id}/gaze.csv`,
+      fixations:`data/${id}/fixations.csv`,
+      affect:`data/${id}/affect.txt`
+    };
+  }
+
+  function populateParticipantMenu(ids){
+    const select=$("participant");
+    participantIds=[...new Set((ids||[]).map(v=>String(v).trim()).filter(Boolean))];
+    select.innerHTML="";
+    for(const id of participantIds){
+      const option=document.createElement("option");
+      option.value=id; option.textContent=id;
+      select.appendChild(option);
+    }
+    if(!participantIds.length){
+      const option=document.createElement("option");
+      option.value=""; option.textContent="No participants configured";
+      select.appendChild(option); select.disabled=true;
+      return "";
+    }
+    select.disabled=false;
+    const preferred=participantIds.includes("P12")?"P12":participantIds[0];
+    select.value=preferred;
+    return preferred;
+  }
+
+  function clearParticipantState(id){
+    stop();
+    syncRunToken++;
+    currentParticipant=id;
+    gaze=[]; fixations=[]; affect=[]; gazeTimes=[]; eventPrefix=new Map();
+    recordingZero=0; affectRecordingZeroLocal=0; recordingStartSec=0; recordingEndSec=0;
+    sessionTime=0; sessionDuration=0; currentGazeIndex=-1;
+    syncOffsetInput.value="0.00";
+    markers=structuredClone(DEFAULT_MARKERS); renderMarkers();
+    slider.value="0"; slider.max="0";
+    if(gazePoint) gazePoint.style.display="none";
+    if(gazeTrail) gazeTrail.innerHTML="";
+    heatCtx.clearRect(0,0,heatmap.width,heatmap.height);
+    if(affectHeatCtx) affectHeatCtx.clearRect(0,0,affectHeatmap.width,affectHeatmap.height);
+    const dom=$("dominantZones"); if(dom) dom.innerHTML="";
+    const syncMsg=$("syncMessage"); if(syncMsg) syncMsg.textContent="Waiting for participant data…";
+    const q=$("syncQuality"); if(q){q.className="quality weak"; q.textContent="Not synchronized";}
+    renderAffectCurrent(NaN);
+    updateAffectAvailability();
+    renderAffectChart();
+    renderStimulusTrack();
+    updateCoverage();
+    status.textContent=`Loading ${id}…`;
     updateParticipantVideo(id);
-    stop(); syncRunToken++; currentParticipant=id; status.textContent=`Loading ${id}…`;
-    const cfg=PARTICIPANTS[id]; if(!cfg){status.textContent=`No data configured for ${id}`;return;}
+  }
+
+  async function loadParticipant(id, auto=true){
+    if(!id)return;
+    const token=++participantLoadToken;
+    clearParticipantState(id);
+    const cfg=participantConfig(id);
     try{
       const [g,f,a]=await Promise.all([
         fetch(cfg.gaze).then(r=>{if(!r.ok)throw Error(cfg.gaze);return r.text()}),
         fetch(cfg.fixations).then(r=>{if(!r.ok)throw Error(cfg.fixations);return r.text()}),
-        cfg.affect?fetch(cfg.affect).then(r=>r.ok?r.text():"").catch(()=>""):Promise.resolve("")
+        fetch(cfg.affect).then(r=>r.ok?r.text():"").catch(()=>"")
       ]);
-      gaze=parseGaze(g);fixations=parseFixations(f);affect=a?parseAffect(a):[];
+      if(token!==participantLoadToken || currentParticipant!==id)return;
+      gaze=parseGaze(g); fixations=parseFixations(f); affect=a?parseAffect(a):[];
       // Gaze is the primary coverage stream. Affect is aligned using the same local/Unix timestamp clock.
       recordingZero=gaze.length?gaze[0].deviceTimestamp:(fixations.length?fixations[0].start:0);
       affectRecordingZeroLocal=gaze.length?gaze[0].localTimestamp:0;
@@ -758,17 +816,28 @@
       sessionTime=0; syncOffsetInput.value="0.00";
       buildSyncIndex();
       updateAffectAvailability();
-      renderStimulusTrack();renderAt(0);updateQuality();updateCoverage();
+      renderStimulusTrack(); renderAt(0); updateQuality(); updateCoverage();
       status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · gaze coverage <strong>${fmt(recordingEndSec)}</strong>${affect.length?` · ${affect.length.toLocaleString()} affect samples`:''}`;
-      if(auto)setTimeout(()=>{ if(currentParticipant===id) autoSync(); },120);
-    }catch(err){console.error(err);status.textContent=`Could not load ${id} participant data`;}
+      if(auto)setTimeout(()=>{ if(token===participantLoadToken && currentParticipant===id) autoSync(); },120);
+    }catch(err){
+      if(token!==participantLoadToken || currentParticipant!==id)return;
+      console.error(err);
+      status.textContent=`Could not load ${id} participant data`;
+    }
   }
 
   renderMarkerInputs();
-  fetch("data/stimuli.json").then(r=>r.json()).then(s=>{
-    stimuli=s;
-    $("participant").addEventListener("change",e=>loadParticipant(e.target.value,true));
   bindParticipantVideoControls();
-    return loadParticipant($("participant").value,true);
-  }).catch(err=>{console.error(err);status.textContent="Could not load stimulus configuration";});
+  Promise.all([
+    fetch("data/stimuli.json").then(r=>{if(!r.ok)throw Error("data/stimuli.json");return r.json()}),
+    fetch("data/participants.json").then(r=>{if(!r.ok)throw Error("data/participants.json");return r.json()})
+  ]).then(([s,ids])=>{
+    stimuli=s;
+    const initial=populateParticipantMenu(ids);
+    $("participant").addEventListener("change",e=>loadParticipant(e.target.value,true));
+    if(initial)return loadParticipant(initial,true);
+  }).catch(err=>{
+    console.error(err);
+    status.textContent="Could not load stimulus or participant configuration";
+  });
 })();
