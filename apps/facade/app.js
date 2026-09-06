@@ -315,6 +315,9 @@
   }
   function scoreOffset(offset){
     // Fast, participant-independent validation using precomputed AOI prefix counts.
+    // A synchronization is only meaningful when a substantial part of the fixed
+    // 4:19 stimulus overlaps the participant gaze stream. This prevents a single
+    // late fixation from placing almost the entire stimulus after the recording.
     let weighted=0,possible=0,hits=0,used=0;
     const matches=[];
     for(const e of stimuli.events.filter(e=>e.id!=="combined")){
@@ -335,7 +338,17 @@
     }
     const agreement=possible?weighted/possible:0;
     const support=used?hits/used:0;
-    return {score:.78*agreement+.22*support,hits,used,offset,matches};
+    const baseScore=.78*agreement+.22*support;
+
+    const stimulusStart=offset, stimulusEnd=offset+stimuli.duration;
+    const overlap=Math.max(0,Math.min(recordingEndSec,stimulusEnd)-Math.max(recordingStartSec,stimulusStart));
+    // Normalize by the greatest overlap this participant could possibly provide.
+    // Long recordings can reach 100%; shorter recordings are not unfairly penalized.
+    const maxPossibleOverlap=Math.min(stimuli.duration,Math.max(0,recordingEndSec-recordingStartSec));
+    const overlapRatio=maxPossibleOverlap?overlap/maxPossibleOverlap:0;
+    const zoneCoverage=stimuli.events.length?used/stimuli.events.filter(e=>e.id!=="combined").length:0;
+    const score=baseScore*.76+overlapRatio*.18+zoneCoverage*.06;
+    return {score,baseScore,hits,used,offset,matches,overlap,overlapRatio,zoneCoverage};
   }
   function fixationCandidatesForEvent(event){
     const minConf=Math.max(.55,+minConfidence.value||0), out=[];
@@ -378,9 +391,14 @@
       const stop=Math.min(candidates.length,base+chunk);
       for(let i=base;i<stop;i++){
         const c=candidates[i],validation=scoreOffset(c.offset);
+        // Reject geometrically plausible one-zone coincidences that leave most of
+        // the known stimulus outside the available participant recording.
+        // The threshold is relative to this participant's maximum possible overlap,
+        // so it also works for recordings shorter than the 4:19 stimulus.
+        if(validation.overlapRatio<.80 || validation.used<Math.min(5,stimuli.events.length))continue;
         const fixationQuality=c.ratio*Math.min(1,c.fixation.durationMs/220);
         const distinctive=(c.event.syncAnchor?.045:0)+(c.event.id==="top-figure"?.02:0);
-        const combined=validation.score*.86+fixationQuality*.10+distinctive;
+        const combined=validation.score*.82+fixationQuality*.10+distinctive;
         const item={...c,validation,combined};
         if(!best || item.combined>best.combined || (item.combined===best.combined&&item.validation.hits>best.validation.hits))best=item;
       }
@@ -404,13 +422,17 @@
       updateQuality(anchor.validation);renderStimulusTrack();renderAt(sessionTime);
       const zone=stimuli.events.indexOf(anchor.event)+1;
       const supported=anchor.validation.matches.map(m=>stimuli.events.indexOf(m.event)+1).join(", ")||"none";
-      $("syncMessage").textContent=`Best candidate: Zone ${zone} (${anchor.event.label}), fixation #${anchor.fixation.id} at participant ${fmt(anchor.recordingTime)}. Estimated stimulus-video start: participant ${fmt(anchor.offset)}. Supporting zones: ${supported} (${anchor.validation.hits}/${anchor.validation.used}); anchor AOI coverage ${(anchor.ratio*100).toFixed(0)}%.`;
+      $("syncMessage").textContent=`Best candidate: Zone ${zone} (${anchor.event.label}), fixation #${anchor.fixation.id} at participant ${fmt(anchor.recordingTime)}. Estimated stimulus-video start: participant ${fmt(anchor.offset)}. Supporting zones: ${supported} (${anchor.validation.hits}/${anchor.validation.used}); stimulus/data overlap ${(anchor.validation.overlapRatio*100).toFixed(0)}%; anchor AOI coverage ${(anchor.ratio*100).toFixed(0)}%.`;
     } finally {
       if(token===syncRunToken){btn.disabled=false;btn.textContent="Auto-sync from stimulus zones";}
     }
   }
   function updateQuality(s=scoreOffset(+syncOffsetInput.value||0)){
-    const q=$("syncQuality");q.className="quality";let label="Weak";if(s.score>=.55&&s.hits>=4){label="Strong";q.classList.add("good")}else if(s.score>=.30&&s.hits>=2){label="Moderate";q.classList.add("mid")}else q.classList.add("weak");q.textContent=`${label} · ${(s.score*100).toFixed(0)}%`;
+    const q=$("syncQuality");q.className="quality";let label="Weak";
+    if(s.score>=.55&&s.hits>=4&&s.used>=5&&s.overlapRatio>=.80){label="Strong";q.classList.add("good")}
+    else if(s.score>=.30&&s.hits>=2&&s.used>=4&&s.overlapRatio>=.65){label="Moderate";q.classList.add("mid")}
+    else q.classList.add("weak");
+    q.textContent=`${label} · ${(s.score*100).toFixed(0)}% · overlap ${(s.overlapRatio*100).toFixed(0)}%`;
   }
 
   function animation(now){if(!playing)return;if(!lastAnimation)lastAnimation=now;const dt=(now-lastAnimation)/1000;lastAnimation=now;const next=sessionTime+dt*(+$("speed").value||1);if(next>=sessionDuration){renderAt(sessionDuration);stop();return}renderAt(next);raf=requestAnimationFrame(animation)}
