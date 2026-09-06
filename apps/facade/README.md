@@ -45,3 +45,16 @@ Missing `affect.txt` remains supported and is reported as unavailable rather tha
 The v32 single-affect and Combined (dominant) heatmaps are preserved, including minimum-affect filtering and persistent temporal fading/reinforcement.
 
 As in recent versions, `assets/` and `videos/` are intentionally not packaged because they are shared by the deployment.
+
+
+## v34
+Fixed affective controls when switching participants. Participants without affect data temporarily disable the affect controls without clearing the user's selected affect series. When switching back to a participant with affect data, the chart, current-state values, and affective heatmaps become available again automatically.
+
+
+## v35
+
+- Checks all affect-series checkboxes by default, including Focus.
+- Selects **Combined (dominant)** as the default affective heatmap.
+- Compresses the sticky timeline card by merging playback and display controls into one slim top row on wide screens.
+- Removes the nested display-control box styling and shortens labels so the floating panel consumes less vertical space.
+- Keeps gaze and affective heatmaps mutually exclusive; the affective heatmap remains the default.

@@ -225,7 +225,7 @@
     const statusEl=$("affectStatus"),coverage=$("affectCoverage");
     const has=affect.length>0;if(statusEl){statusEl.className='quality '+(has?'good':'weak');statusEl.textContent=has?`${affect.length.toLocaleString()} samples`:'No file';}
     if(coverage){if(!has)coverage.textContent='not available';else{const inStart=Math.max(0,affectSec(affect[0])),inEnd=Math.min(recordingEndSec,affectSec(affect.at(-1)));coverage.textContent=inEnd>inStart?`${fmt(inStart)}–${fmt(inEnd)}`:'outside gaze window';}}
-    for(const input of document.querySelectorAll('#affectControls input[data-affect]')){const m=input.dataset.affect,valid=affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec);input.disabled=!valid;if(!valid)input.checked=false;}
+    for(const input of document.querySelectorAll('#affectControls input[data-affect]')){const m=input.dataset.affect,valid=affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec);input.disabled=!valid;}
     if(affectHeatMetricSelect){
       let currentValid=false, firstValid=null;
       const anyValid=validAffectHeatMetrics().length>0;
