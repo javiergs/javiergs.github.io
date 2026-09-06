@@ -80,6 +80,9 @@
   function selectedAffectHeatMetric(){
     return affectHeatMetricSelect?.value || "Engagement";
   }
+  function validAffectHeatMetrics(){
+    return AFFECT_METRICS.filter(m=>affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec));
+  }
   function renderAffectChart(){
     const canvas=$("affectChart"); if(!canvas)return;
     const rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1,w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));
@@ -155,29 +158,34 @@
     if(!showAffectHeatmap?.checked || !affect.length || !gaze.length)return;
 
     const metric=selectedAffectHeatMetric();
+    const combined=metric==="Combined";
+    const heatMetrics=combined?validAffectHeatMetrics():[metric];
+    if(!heatMetrics.length)return;
     const recEnd=Math.min(sessionTime,recordingEndSec);
     if(recEnd<=recordingStartSec)return;
 
-    // Persistent affective memory heatmap. Every qualifying gaze sample remains visible
-    // after it occurs, but its spatial evidence fades toward a light floor as it gets older.
-    // Looking at the same area again while the selected affect is present reinforces it.
-    // Hue identifies the affect; tone identifies its 0–1 value; alpha carries recency/reinforcement.
+    // Persistent affective memory heatmap.
+    // Single-affect mode keeps one canonical hue. Combined mode keeps a field per affect and,
+    // at each pixel, renders only the affect with the strongest local mean response.
+    // Old evidence fades to a light residual tone but remains visible; repeated/recent evidence reinforces it.
     const scale=.30, fw=Math.max(120,Math.round(w*scale)), fh=Math.max(80,Math.round(h*scale));
-    const weightedValue=new Float32Array(fw*fh), temporalSupport=new Float32Array(fw*fh);
+    const fieldSize=fw*fh;
+    const valueFields=Object.fromEntries(heatMetrics.map(m=>[m,new Float32Array(fieldSize)]));
+    const supportFields=Object.fromEntries(heatMetrics.map(m=>[m,new Float32Array(fieldSize)]));
     const radius=Math.max(7,Math.round(fw*.016)),r2=radius*radius;
-    const memoryFloor=.10;       // old evidence never vanishes completely
-    const decaySeconds=42;      // recent evidence fades smoothly toward the floor
+    const memoryFloor=.10;
+    const decaySeconds=42;
+    const affectThreshold=clamp(+(minAffect?.value ?? 0.5),0,1);
     let i=nearestGazeIndex(recordingStartSec),sample=0;if(i<0)return;
     while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>recordingStartSec)i--;
     for(;i<gaze.length;i++){
       const recSec=gaze[i].deviceTimestamp-recordingZero;if(recSec>recEnd)break;
       const gr=gaze[i];if(recSec<recordingStartSec||!validGaze(gr))continue;
-      // Pupil gaze is high frequency. Subsample so reinforcement reflects sustained/repeated
-      // viewing without letting raw sampling rate dominate the heatmap.
       if(sample++%16)continue;
-      const ar=nearestAffect(recSec),value=ar?.values?.[metric];
-      const affectThreshold=clamp(+(minAffect?.value ?? 0.5),0,1);
-      if(value==null||value<affectThreshold)continue;
+      const ar=nearestAffect(recSec);if(!ar)continue;
+      const activeValues=[];
+      for(const m of heatMetrics){const value=ar.values?.[m];if(value!=null&&value>=affectThreshold)activeValues.push([m,value]);}
+      if(!activeValues.length)continue;
       const age=Math.max(0,recEnd-recSec);
       const temporalWeight=memoryFloor+(1-memoryFloor)*Math.exp(-age/decaySeconds);
       const p=mapSurface(gr.surfaceX,gr.surfaceY),cx=Math.round(p.x/100*(fw-1)),cy=Math.round(p.y/100*(fh-1));
@@ -186,23 +194,27 @@
         const dy=yy-cy;
         for(let xx=x0;xx<=x1;xx++){
           const dx=xx-cx,d2=dx*dx+dy*dy;if(d2>r2)continue;
-          const q=1-d2/r2,k=q*q,idx=yy*fw+xx;
-          const evidence=k*temporalWeight;
-          weightedValue[idx]+=evidence*value;
-          temporalSupport[idx]+=evidence;
+          const q=1-d2/r2,kernel=q*q,idx=yy*fw+xx;
+          const evidence=kernel*temporalWeight;
+          for(const [m,value] of activeValues){
+            valueFields[m][idx]+=evidence*value;
+            supportFields[m][idx]+=evidence;
+          }
         }
       }
     }
 
     const out=new ImageData(fw,fh);
-    for(let idx=0;idx<temporalSupport.length;idx++){
-      const support=temporalSupport[idx];if(support<=.008)continue;
-      const value=clamp(weightedValue[idx]/support,0,1);
-      if(value<=.01)continue;
-      const {rgb,alpha}=affectTone(metric,value);
-      // A single old response stays faint; recent or repeatedly reinforced evidence becomes opaque.
-      // Log compression prevents long fixations from immediately saturating the entire kernel.
-      const supportMask=clamp(Math.log1p(support*2.2)/Math.log1p(5.5),0,1);
+    for(let idx=0;idx<fieldSize;idx++){
+      let winner=null,winnerValue=-1,winnerSupport=0;
+      for(const m of heatMetrics){
+        const support=supportFields[m][idx];if(support<=.008)continue;
+        const mean=clamp(valueFields[m][idx]/support,0,1);
+        if(mean>winnerValue){winner=m;winnerValue=mean;winnerSupport=support;}
+      }
+      if(!winner||winnerValue<=.01)continue;
+      const {rgb,alpha}=affectTone(winner,winnerValue);
+      const supportMask=clamp(Math.log1p(winnerSupport*2.2)/Math.log1p(5.5),0,1);
       const k=idx*4;out.data[k]=rgb[0];out.data[k+1]=rgb[1];out.data[k+2]=rgb[2];out.data[k+3]=Math.round(255*alpha*supportMask);
     }
     const colored=document.createElement('canvas');colored.width=fw;colored.height=fh;colored.getContext('2d').putImageData(out,0,0);
@@ -215,8 +227,9 @@
     for(const input of document.querySelectorAll('#affectControls input[data-affect]')){const m=input.dataset.affect,valid=affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec);input.disabled=!valid;if(!valid)input.checked=false;}
     if(affectHeatMetricSelect){
       let currentValid=false, firstValid=null;
+      const anyValid=validAffectHeatMetrics().length>0;
       for(const option of [...affectHeatMetricSelect.options]){
-        const m=option.value,valid=affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec);
+        const m=option.value,valid=m==="Combined"?anyValid:affect.some(r=>r.values[m]!=null && affectSec(r)>=0 && affectSec(r)<=recordingEndSec);
         option.disabled=!valid;if(valid&&!firstValid)firstValid=m;if(valid&&m===affectHeatMetricSelect.value)currentValid=true;
       }
       if(!currentValid&&firstValid)affectHeatMetricSelect.value=firstValid;

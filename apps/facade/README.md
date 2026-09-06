@@ -1,25 +1,18 @@
-# Heart Castle Facade Study Dashboard v28
+# Heart Castle Facade Study Dashboard — v31
 
-Changes in v28:
-- Replaces the AOI-colored affect overlay with an affect-specific **gaze heatmap**.
-- Select one affective measure (Focus, Engagement, Excitement, Interest, Relaxation, Stress).
-- Only gaze samples with a valid synchronized value for that selected measure contribute to the affective heatmap.
-- Spatial heat value is the local kernel-weighted **mean affect value (0–1)**, not elapsed time or gaze count.
-- Hue remains fixed per affective measure; tone/saturation and alpha represent the measure's 0–1 intensity.
-- Standard cumulative gaze heatmap and affective gaze heatmap are mutually exclusive to avoid ambiguous overlays.
-- Keeps the sticky full-width timeline and per-participant data layout (`data/P12/`, `data/P03/`, etc.).
-- `assets/` and `videos/` are intentionally not packaged; the app references the existing shared folders.
+This version adds a **Combined (dominant)** affective gaze heatmap while preserving the existing single-affect heatmaps.
 
+## Combined affective heatmap
+- Select **Combined (dominant)** from the Affect selector in the floating timeline controls.
+- The dashboard maintains a separate spatial field for every valid affective measure.
+- At each heatmap pixel, only the affect with the highest local mean response is shown.
+- Hue identifies the winning affect using the existing palette.
+- Tone reflects that affect's 0–1 magnitude.
+- Recency and repeated gaze/affect evidence reinforce opacity.
+- Older evidence remains visible as a lighter residual tone rather than disappearing.
+- **Minimum affect** is applied before samples contribute to any affective field.
+- Pixels remain transparent when no valid affect exceeds the selected threshold.
 
-## v30
-- Moved display controls into the sticky timeline card in a compact single-line/wrapping control strip.
-- Added **Minimum affect** threshold for the affective gaze heatmap (default `0.50`). Only synchronized samples at or above the threshold contribute.
-- Replaced the affect heatmap radio grid with a compact Affect selector in the timeline controls.
-- Removed the low/high color legend for the cumulative gaze heatmap.
-- Kept gaze confidence filtering and minimum confidence beside the other display controls.
-- `assets/` and `videos/` are still external/shared and are not included in this package.
+Single-affect mode continues to show only the selected affect using the same persistent-memory behavior introduced in v30.
 
-
-## v30 affective heatmap memory
-
-The affective gaze heatmap is now persistent with temporal decay. A qualifying gaze/affect response remains visible after it occurs, but fades toward a light residual tone as it becomes older. Repeated or recent evidence at the same location reinforces the overlay. The selected affect keeps its canonical hue; its 0–1 value controls tone, while recency/reinforcement controls alpha. The existing Minimum affect threshold still filters weak responses before they enter the map.
+As in recent versions, `assets/` and `videos/` are intentionally not packaged because they are shared by the deployment.
