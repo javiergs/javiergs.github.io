@@ -1,0 +1,19 @@
+{
+  "participant": "P11",
+  "demographic": {
+    "q1": "White",
+    "q2": "Male",
+    "q3": "1st year undergraduate student",
+    "q4": "ARCH"
+  },
+  "experimental": {
+    "q1": "Gate",
+    "q2": "end of video, when all of the objects are highlighted",
+    "q3": "Gate",
+    "q4": "Yes",
+    "q5": "No",
+    "q6": "No",
+    "q7": "Yes",
+    "q8": "Yes"
+  }
+}

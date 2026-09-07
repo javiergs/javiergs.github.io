@@ -1,0 +1,19 @@
+{
+  "participant": "P06",
+  "demographic": {
+    "q1": "White",
+    "q2": "Male",
+    "q3": "4th year undergraduate student",
+    "q4": "Other: Computer Science"
+  },
+  "experimental": {
+    "q1": "Madonna and Child",
+    "q2": "Introduction/beginning of projection",
+    "q3": "Gate, Equestrian Sculpture",
+    "q4": "Yes",
+    "q5": "No",
+    "q6": "No",
+    "q7": "No",
+    "q8": "No"
+  }
+}

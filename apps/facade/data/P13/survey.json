@@ -1,0 +1,19 @@
+{
+  "participant": "P13",
+  "demographic": {
+    "q1": "White",
+    "q2": "Male",
+    "q3": "Faculty/Staff",
+    "q4": "ARCH"
+  },
+  "experimental": {
+    "q1": "Madonna and Child",
+    "q2": "Wild Men",
+    "q3": "Gate, Wild Men, Equestrian Sculpture",
+    "q4": "Yes",
+    "q5": "No",
+    "q6": "No",
+    "q7": "Yes",
+    "q8": "Yes"
+  }
+}

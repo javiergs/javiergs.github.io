@@ -1,0 +1,19 @@
+{
+  "participant": "P03",
+  "demographic": {
+    "q1": "Hispanic/Latino",
+    "q2": "Female",
+    "q3": "5th year undergraduate student",
+    "q4": "ARCH"
+  },
+  "experimental": {
+    "q1": "Gate",
+    "q2": "St.Peter and St.Paul reliefs",
+    "q3": "Equestrian Sculpture",
+    "q4": "Yes",
+    "q5": "No",
+    "q6": "No",
+    "q7": "Yes",
+    "q8": "No"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "participant": "P15",
+  "demographic": {
+    "q1": "Hispanic/Latino",
+    "q2": "Male",
+    "q3": "3rd year undergraduate student",
+    "q4": "Other: Computer Science"
+  },
+  "experimental": {
+    "q1": "Wild Men",
+    "q2": "Introduction/beginning of projection",
+    "q3": "Other objects you noticed that were not highlighted",
+    "q4": "Too long",
+    "q5": "Yes",
+    "q6": "Yes",
+    "q7": "No",
+    "q8": "Yes"
+  }
+}

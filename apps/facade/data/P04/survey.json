@@ -1,0 +1,19 @@
+{
+  "participant": "P04",
+  "demographic": {
+    "q1": "Hispanic/Latino",
+    "q2": "Male",
+    "q3": "2nd year undergraduate student",
+    "q4": "ARCH"
+  },
+  "experimental": {
+    "q1": "Gate",
+    "q2": "end of video, when all of the objects are highlighted",
+    "q3": "Equestrian Sculpture",
+    "q4": "Yes",
+    "q5": "No",
+    "q6": "No",
+    "q7": "No",
+    "q8": "No"
+  }
+}

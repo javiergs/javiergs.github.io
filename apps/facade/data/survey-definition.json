@@ -1,0 +1,18 @@
+{
+  "demographic": {
+    "q1": "Demographic Q1",
+    "q2": "Demographic Q2",
+    "q3": "Demographic Q3",
+    "q4": "Demographic Q4"
+  },
+  "experimental": {
+    "q1": "Experiental Q1",
+    "q2": "Experiental Q2",
+    "q3": "Experiental Q3",
+    "q4": "Experiental Q4",
+    "q5": "Experiental Q5",
+    "q6": "Experiental Q6",
+    "q7": "Experiental Q7",
+    "q8": "Experiental Q8"
+  }
+}

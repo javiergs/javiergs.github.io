@@ -1,0 +1,19 @@
+{
+  "participant": "P16",
+  "demographic": {
+    "q1": "White",
+    "q2": "Male",
+    "q3": "Graduate student",
+    "q4": "Other: College of Engineering"
+  },
+  "experimental": {
+    "q1": "Wild Men",
+    "q2": "Wild Men",
+    "q3": "Madonna and Child, St. Peter and St. Paul reliefs",
+    "q4": "Yes",
+    "q5": "No",
+    "q6": "No",
+    "q7": "No",
+    "q8": "No"
+  }
+}

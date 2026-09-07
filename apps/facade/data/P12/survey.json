@@ -1,0 +1,19 @@
+{
+  "participant": "P12",
+  "demographic": {
+    "q1": "White, Hispanic/Latino, American indian or Alaskan Native",
+    "q2": "Male",
+    "q3": "Faculty/Staff",
+    "q4": "ARCH"
+  },
+  "experimental": {
+    "q1": "Madonna and Child",
+    "q2": "Introduction/beginning of projection",
+    "q3": "Other objects you noticed that were not highlighted",
+    "q4": "Too short",
+    "q5": "No",
+    "q6": "No",
+    "q7": "No",
+    "q8": "Yes"
+  }
+}
