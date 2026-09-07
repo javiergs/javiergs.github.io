@@ -5,8 +5,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <title>Heart Castle Facade Study Dashboard</title>
-<link href="style.css?v=38" rel="stylesheet"/>
-<link href="survey.css?v=38" rel="stylesheet"/>
+<link href="style.css?v=39" rel="stylesheet"/>
 </head>
 <body>
 <header class="site-header">
@@ -156,32 +155,35 @@
 </dl></div>
 </div></section>
 </section>
-
-<section class="survey-section panel">
-  <div class="section-title-row">
-    <div>
-      <h2>Participant survey</h2>
-      <p>Demographic and experiential responses for the selected participant.</p>
-    </div>
-    <span class="quality" id="surveyStatus">Loading</span>
-  </div>
-  <div class="survey-grid">
-    <section class="survey-card">
-      <h3>Demographic</h3>
-      <div class="survey-list" id="surveyDemographic"></div>
-    </section>
-    <section class="survey-card">
-      <h3>Experiential</h3>
-      <div class="survey-list" id="surveyExperimental"></div>
-    </section>
-  </div>
-</section>
 <section class="dashboard-row admin-row">
 <section class="panel sync-panel admin-panel"><div class="panel-heading"><h2>Synchronization</h2><span class="quality" id="syncQuality">Not scored</span></div><p class="muted small">Offset = recording time − stimulus-video time.</p><label class="field">Recording offset (s)<input id="syncOffset" step="0.01" type="number" value="0.00"/></label><div class="nudge-row"><button data-nudge="-1">−1 s</button><button data-nudge="-0.1">−0.1</button><button data-nudge="0.1">+0.1</button><button data-nudge="1">+1 s</button></div><button class="primary" id="autoSync" type="button">Auto-sync from stimulus zones</button><div class="sync-readout"><span>Video <strong id="syncStimulusTime">—</strong></span><span>Recording <strong id="recordingTime">—</strong></span></div><p class="muted small" id="syncMessage">Auto-sync tests fixation responses against all eight known stimulus zones.</p></section>
 <section class="panel admin-panel"><h2>Surface mapping</h2><p class="muted small">The four points map normalized Pupil Surface coordinates onto the canonical façade.</p><div class="marker-inputs" id="markerInputs"></div></section>
 </section>
+
+<section class="panel participant-survey-panel">
+  <div class="panel-heading">
+    <div>
+      <h2>Participant Survey</h2>
+      <p class="muted small">Demographic and experiential responses for the selected participant.</p>
+    </div>
+    <span class="quality weak" id="surveyStatus">No file</span>
+  </div>
+
+  <div class="participant-survey-grid">
+    <section class="participant-survey-box">
+      <h3>Demographic</h3>
+      <div id="surveyDemographic" class="participant-survey-list"></div>
+    </section>
+
+    <section class="participant-survey-box">
+      <h3>Experiential</h3>
+      <div id="surveyExperimental" class="participant-survey-list"></div>
+    </section>
+  </div>
+</section>
+
 </main>
 <footer aria-hidden="true" class="site-footer"></footer>
-<script src="app.js?v=38"></script>
+<script src="app.js?v=39"></script>
 </body>
 </html>

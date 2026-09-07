@@ -238,7 +238,7 @@
   }
 
 
-  function surveyValue(v){
+  function surveyDisplayValue(v){
     return (v===null || v===undefined || String(v).trim()==="") ? "—" : String(v);
   }
 
@@ -249,38 +249,46 @@
     const defs=surveyDefinition?.[sectionName] || {};
     const keys=Object.keys(defs).length ? Object.keys(defs) : Object.keys(values || {});
     if(!keys.length){
-      box.innerHTML='<p class="survey-empty">No survey responses available.</p>';
+      const p=document.createElement("p");
+      p.className="participant-survey-empty";
+      p.textContent="No survey responses available.";
+      box.appendChild(p);
       return;
     }
+
     for(const key of keys){
       const row=document.createElement("div");
-      row.className="survey-row";
+      row.className="participant-survey-row";
+
       const q=document.createElement("div");
-      q.className="survey-question";
+      q.className="participant-survey-question";
       q.textContent=defs[key] || key.toUpperCase();
+
       const a=document.createElement("div");
-      a.className="survey-answer";
-      a.textContent=surveyValue(values?.[key]);
-      if(a.textContent==="—")a.classList.add("missing");
+      a.className="participant-survey-answer";
+      a.textContent=surveyDisplayValue(values?.[key]);
+      if(a.textContent==="—")a.classList.add("is-missing");
+
       row.append(q,a);
       box.appendChild(row);
     }
   }
 
   function renderSurvey(){
-    const statusEl=$("surveyStatus");
+    const badge=$("surveyStatus");
     if(!survey){
-      if(statusEl){
-        statusEl.className="quality weak";
-        statusEl.textContent="No file";
+      if(badge){
+        badge.className="quality weak";
+        badge.textContent="No file";
       }
       renderSurveySection("surveyDemographic","demographic",{});
       renderSurveySection("surveyExperimental","experimental",{});
       return;
     }
-    if(statusEl){
-      statusEl.className="quality good";
-      statusEl.textContent="Available";
+
+    if(badge){
+      badge.className="quality good";
+      badge.textContent="Available";
     }
     renderSurveySection("surveyDemographic","demographic",survey.demographic || {});
     renderSurveySection("surveyExperimental","experimental",survey.experimental || {});
@@ -594,9 +602,6 @@
     }
   }
   function scoreOffset(offset){
-    // Stimulus video cannot begin before participant time zero.
-    // This prevents a short surface-gaze window from being matched to a late
-    // middle portion of the 4:19 stimulus.
     if(offset<0){
       return {score:0,baseScore:0,hits:0,used:0,offset,matches:[],overlap:0,overlapRatio:0,zoneCoverage:0};
     }
@@ -825,8 +830,6 @@
     const requested=(params.get("p")||"").trim();
     const preferred=requested && participantIds.includes(requested) ? requested : participantIds[0];
     select.value=preferred;
-
-    // Keep the URL canonical so a refresh/bookmark reopens the same participant.
     const url=new URL(window.location.href);
     url.searchParams.set("p",preferred);
     history.replaceState(null,"",url);
@@ -874,8 +877,7 @@
       ]);
       if(token!==participantLoadToken || currentParticipant!==id)return;
       gaze=parseGaze(g); fixations=f?parseFixations(f):[]; affect=a?parseAffect(a):[]; survey=surveyData;
-      // Participant time zero is the earliest available device-time evidence,
-      // not necessarily the first gaze sample mapped onto the facade surface.
+      // Earliest gaze/fixation evidence defines participant time zero.
       const gazeFirstDevice=gaze.length?gaze[0].deviceTimestamp:Infinity;
       const fixationFirstDevice=fixations.length?fixations[0].start:Infinity;
       recordingZero=Math.min(gazeFirstDevice,fixationFirstDevice);
@@ -888,10 +890,12 @@
       const fixationEndSec=fixations.length
         ? Math.max(...fixations.map(f=>f.start+f.durationMs/1000))-recordingZero
         : 0;
+
+      // Gaze defines the participant-data end when gaze exists.
+      // Late fixation timestamps cannot stretch the dashboard timeline.
       recordingEndSec=gaze.length?gazeEndSec:Math.max(fixationEndSec,0);
 
-      // Affect timestamps use the local/Unix clock. Convert participant time zero
-      // into that clock using the first gaze row, which contains both clock domains.
+      // Convert participant time zero into the affect local/Unix clock.
       affectRecordingZeroLocal=gaze.length
         ? gaze[0].localTimestamp-(gaze[0].deviceTimestamp-recordingZero)
         : (affect.length?affect[0].timestamp:0);
@@ -900,7 +904,7 @@
       updateAffectAvailability();
       renderSurvey();
       renderStimulusTrack(); renderAt(0); updateQuality(); updateCoverage();
-      status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · participant <strong>${fmt(recordingEndSec)}</strong> · surface gaze <strong>${fmt(gazeStartSec)}–${fmt(gazeEndSec)}</strong>${affect.length?` · ${affect.length.toLocaleString()} affect samples`:''}`;
+      status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · gaze coverage <strong>${fmt(recordingEndSec)}</strong>${affect.length?` · ${affect.length.toLocaleString()} affect samples`:''}`;
       if(auto)setTimeout(()=>{ if(token===participantLoadToken && currentParticipant===id) autoSync(); },120);
     }catch(err){
       if(token!==participantLoadToken || currentParticipant!==id)return;
