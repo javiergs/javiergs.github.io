@@ -13,7 +13,7 @@
   const markerEls = {tl:$("markerTL"),tr:$("markerTR"),bl:$("markerBL"),br:$("markerBR")};
 
   let gaze=[], fixations=[], affect=[], stimuli={duration:259,events:[]};
-  let recordingZero=0, recordingStartSec=0, recordingEndSec=0, sessionTime=0, playing=false, raf=0, lastAnimation=0;
+  let recordingZero=0, recordingStartSec=0, recordingEndSec=0, gazeStartSec=0, gazeEndSec=0, sessionTime=0, playing=false, raf=0, lastAnimation=0;
   let sessionDuration=0;
   let currentGazeIndex=-1, currentParticipant="";
   let participantIds=[];
@@ -162,8 +162,8 @@
     const combined=metric==="Combined";
     const heatMetrics=combined?validAffectHeatMetrics():[metric];
     if(!heatMetrics.length)return;
-    const recEnd=Math.min(sessionTime,recordingEndSec);
-    if(recEnd<=recordingStartSec)return;
+    const recEnd=Math.min(sessionTime,gazeEndSec);
+    if(recEnd<=gazeStartSec)return;
 
     // Persistent affective memory heatmap.
     // Single-affect mode keeps one canonical hue. Combined mode keeps a field per affect and,
@@ -177,11 +177,11 @@
     const memoryFloor=.10;
     const decaySeconds=42;
     const affectThreshold=clamp(+(minAffect?.value ?? 0.5),0,1);
-    let i=nearestGazeIndex(recordingStartSec),sample=0;if(i<0)return;
-    while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>recordingStartSec)i--;
+    let i=nearestGazeIndex(gazeStartSec),sample=0;if(i<0)return;
+    while(i>0&&(gaze[i].deviceTimestamp-recordingZero)>gazeStartSec)i--;
     for(;i<gaze.length;i++){
       const recSec=gaze[i].deviceTimestamp-recordingZero;if(recSec>recEnd)break;
-      const gr=gaze[i];if(recSec<recordingStartSec||!validGaze(gr))continue;
+      const gr=gaze[i];if(recSec<gazeStartSec||!validGaze(gr))continue;
       if(sample++%16)continue;
       const ar=nearestAffect(recSec);if(!ar)continue;
       const activeValues=[];
@@ -416,7 +416,7 @@
     ensureCanvas(); clearHeatmap();
     heatmap.style.display=showHeatmap.checked?"block":"none";
     if(!showHeatmap.checked)return;
-    const recStart=recordingStartSec, recEnd=Math.min(t,recordingEndSec);
+    const recStart=gazeStartSec, recEnd=Math.min(t,gazeEndSec);
     if(recEnd<=recStart)return;
 
     // Accumulate density in floating point instead of the canvas alpha channel.
@@ -497,7 +497,8 @@
     renderStimulus(inVideo?videoTime:-1);
     const recTime=sessionTime;
     const hasRecording=recTime>=recordingStartSec && recTime<=recordingEndSec;
-    const i=hasRecording?nearestGazeIndex(recTime):-1; currentGazeIndex=i;
+    const hasGaze=recTime>=gazeStartSec && recTime<=gazeEndSec;
+    const i=hasGaze?nearestGazeIndex(recTime):-1; currentGazeIndex=i;
     const mode=overlayMode.value,showGaze=mode==="gaze";
     if(i>=0){
       const r=gaze[i],recordingAtRow=r.deviceTimestamp-recordingZero,close=Math.abs(recordingAtRow-recTime)<0.20,hide=!showGaze||!close||!validGaze(r);
@@ -544,6 +545,12 @@
     }
   }
   function scoreOffset(offset){
+    // Stimulus video cannot begin before participant time zero.
+    // This prevents a short surface-gaze window from being matched to a late
+    // middle portion of the 4:19 stimulus.
+    if(offset<0){
+      return {score:0,baseScore:0,hits:0,used:0,offset,matches:[],overlap:0,overlapRatio:0,zoneCoverage:0};
+    }
     // Fast, participant-independent validation using precomputed AOI prefix counts.
     // A synchronization is only meaningful when a substantial part of the fixed
     // 4:19 stimulus overlaps the participant gaze stream. This prevents a single
@@ -552,10 +559,10 @@
     const matches=[];
     for(const e of stimuli.events.filter(e=>e.id!=="combined")){
       const w=e.weight||1, startRec=e.start+offset, endRec=e.end+offset;
-      if(endRec<recordingStartSec || startRec>recordingEndSec)continue;
+      if(endRec<gazeStartSec || startRec>gazeEndSec)continue;
       used++; possible+=w;
-      const preStart=Math.max(recordingStartSec,startRec-1.5);
-      const responseEnd=Math.min(recordingEndSec,endRec+2.0);
+      const preStart=Math.max(gazeStartSec,startRec-1.5);
+      const responseEnd=Math.min(gazeEndSec,endRec+2.0);
       const pref=eventPrefix.get(e.id);
       const insidePre=rangeCount(pref,preStart,startRec), totalPre=rangeTotal(preStart,startRec);
       const insideActive=rangeCount(pref,startRec,responseEnd), totalActive=rangeTotal(startRec,responseEnd);
@@ -571,10 +578,10 @@
     const baseScore=.78*agreement+.22*support;
 
     const stimulusStart=offset, stimulusEnd=offset+stimuli.duration;
-    const overlap=Math.max(0,Math.min(recordingEndSec,stimulusEnd)-Math.max(recordingStartSec,stimulusStart));
+    const overlap=Math.max(0,Math.min(gazeEndSec,stimulusEnd)-Math.max(gazeStartSec,stimulusStart));
     // Normalize by the greatest overlap this participant could possibly provide.
     // Long recordings can reach 100%; shorter recordings are not unfairly penalized.
-    const maxPossibleOverlap=Math.min(stimuli.duration,Math.max(0,recordingEndSec-recordingStartSec));
+    const maxPossibleOverlap=Math.min(stimuli.duration,Math.max(0,gazeEndSec-gazeStartSec));
     const overlapRatio=maxPossibleOverlap?overlap/maxPossibleOverlap:0;
     const zoneCoverage=stimuli.events.length?used/stimuli.events.filter(e=>e.id!=="combined").length:0;
     const score=baseScore*.76+overlapRatio*.18+zoneCoverage*.06;
@@ -587,7 +594,7 @@
     for(const f of fixations){
       if(f.durationMs<80 || f.confidence<minConf)continue;
       const startSec=f.start-recordingZero, endSec=startSec+f.durationMs/1000;
-      if(endSec<recordingStartSec || startSec>recordingEndSec)continue;
+      if(endSec<gazeStartSec || startSec>gazeEndSec)continue;
       const total=rangeTotal(startSec,endSec);
       if(total<4)continue;
       const inside=rangeCount(pref,startSec,endSec), ratio=inside/total;
@@ -604,7 +611,7 @@
       for(const c of fixationCandidatesForEvent(event)){
         for(const latency of [0,.5,1.0,1.75,2.5]){
           const offset=c.recordingTime-event.start-latency;
-          if(offset<recordingStartSec-stimuli.duration || offset>recordingEndSec)continue;
+          if(offset<0 || offset>recordingEndSec)continue;
           candidates.push({...c,offset,latency});
         }
       }
@@ -774,7 +781,7 @@
     syncRunToken++;
     currentParticipant=id;
     gaze=[]; fixations=[]; affect=[]; gazeTimes=[]; eventPrefix=new Map();
-    recordingZero=0; affectRecordingZeroLocal=0; recordingStartSec=0; recordingEndSec=0;
+    recordingZero=0; affectRecordingZeroLocal=0; recordingStartSec=0; recordingEndSec=0; gazeStartSec=0; gazeEndSec=0;
     sessionTime=0; sessionDuration=0; currentGazeIndex=-1;
     syncOffsetInput.value="0.00";
     markers=structuredClone(DEFAULT_MARKERS); renderMarkers();
@@ -803,21 +810,37 @@
     try{
       const [g,f,a]=await Promise.all([
         fetch(cfg.gaze).then(r=>{if(!r.ok)throw Error(cfg.gaze);return r.text()}),
-        fetch(cfg.fixations).then(r=>{if(!r.ok)throw Error(cfg.fixations);return r.text()}),
+        fetch(cfg.fixations).then(r=>r.ok?r.text():"").catch(()=>""),
         fetch(cfg.affect).then(r=>r.ok?r.text():"").catch(()=>"")
       ]);
       if(token!==participantLoadToken || currentParticipant!==id)return;
-      gaze=parseGaze(g); fixations=parseFixations(f); affect=a?parseAffect(a):[];
-      // Gaze is the primary coverage stream. Affect is aligned using the same local/Unix timestamp clock.
-      recordingZero=gaze.length?gaze[0].deviceTimestamp:(fixations.length?fixations[0].start:0);
-      affectRecordingZeroLocal=gaze.length?gaze[0].localTimestamp:0;
+      gaze=parseGaze(g); fixations=f?parseFixations(f):[]; affect=a?parseAffect(a):[];
+      // Participant time zero is the earliest available device-time evidence,
+      // not necessarily the first gaze sample mapped onto the facade surface.
+      const gazeFirstDevice=gaze.length?gaze[0].deviceTimestamp:Infinity;
+      const fixationFirstDevice=fixations.length?fixations[0].start:Infinity;
+      recordingZero=Math.min(gazeFirstDevice,fixationFirstDevice);
+      if(!Number.isFinite(recordingZero))recordingZero=0;
+
       recordingStartSec=0;
-      recordingEndSec=gaze.length?gaze[gaze.length-1].deviceTimestamp-recordingZero:0;
+      gazeStartSec=gaze.length?gaze[0].deviceTimestamp-recordingZero:0;
+      gazeEndSec=gaze.length?gaze[gaze.length-1].deviceTimestamp-recordingZero:gazeStartSec;
+
+      const fixationEndSec=fixations.length
+        ? Math.max(...fixations.map(f=>f.start+f.durationMs/1000))-recordingZero
+        : 0;
+      recordingEndSec=Math.max(gazeEndSec,fixationEndSec,0);
+
+      // Affect timestamps use the local/Unix clock. Convert participant time zero
+      // into that clock using the first gaze row, which contains both clock domains.
+      affectRecordingZeroLocal=gaze.length
+        ? gaze[0].localTimestamp-(gaze[0].deviceTimestamp-recordingZero)
+        : (affect.length?affect[0].timestamp:0);
       sessionTime=0; syncOffsetInput.value="0.00";
       buildSyncIndex();
       updateAffectAvailability();
       renderStimulusTrack(); renderAt(0); updateQuality(); updateCoverage();
-      status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · gaze coverage <strong>${fmt(recordingEndSec)}</strong>${affect.length?` · ${affect.length.toLocaleString()} affect samples`:''}`;
+      status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · participant <strong>${fmt(recordingEndSec)}</strong> · surface gaze <strong>${fmt(gazeStartSec)}–${fmt(gazeEndSec)}</strong>${affect.length?` · ${affect.length.toLocaleString()} affect samples`:''}`;
       if(auto)setTimeout(()=>{ if(token===participantLoadToken && currentParticipant===id) autoSync(); },120);
     }catch(err){
       if(token!==participantLoadToken || currentParticipant!==id)return;
