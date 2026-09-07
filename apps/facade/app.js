@@ -764,9 +764,9 @@
       return "";
     }
     select.disabled=false;
-    const preferred=participantIds.includes("P12")?"P12":participantIds[0];
-    select.value=preferred;
-    return preferred;
+	const preferred=participantIds[0];
+	select.value=preferred;
+	return preferred;
   }
 
   function clearParticipantState(id){
