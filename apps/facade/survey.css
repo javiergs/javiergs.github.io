@@ -1,0 +1,62 @@
+
+/* Supplemental survey styles only.
+   This file intentionally does NOT redefine any existing dashboard/timeline classes. */
+.survey-section { margin-top: 18px; }
+
+.survey-grid {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.survey-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 14px 16px;
+  min-width: 0;
+}
+
+.survey-card h3 {
+  margin: 0 0 10px;
+  color: var(--brand-deep);
+  font-size: 1rem;
+}
+
+.survey-row {
+  display: grid;
+  grid-template-columns: minmax(120px, .9fr) minmax(0, 1.6fr);
+  gap: 14px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  align-items: start;
+}
+
+.survey-row:first-child { border-top: 0; }
+
+.survey-question {
+  color: var(--muted);
+  font-weight: 650;
+  font-size: .88rem;
+}
+
+.survey-answer {
+  color: var(--ink);
+  font-size: .92rem;
+  overflow-wrap: anywhere;
+}
+
+.survey-answer.missing,
+.survey-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+@media (max-width: 900px) {
+  .survey-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .survey-row { grid-template-columns: 1fr; gap: 3px; }
+}

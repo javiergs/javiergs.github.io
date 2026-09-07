@@ -239,8 +239,7 @@
 
 
   function surveyValue(v){
-    if(v===null || v===undefined || String(v).trim()==="")return "—";
-    return String(v);
+    return (v===null || v===undefined || String(v).trim()==="") ? "—" : String(v);
   }
 
   function renderSurveySection(containerId, sectionName, values){
@@ -248,9 +247,7 @@
     if(!box)return;
     box.innerHTML="";
     const defs=surveyDefinition?.[sectionName] || {};
-    const keys=Object.keys(defs).length
-      ? Object.keys(defs)
-      : Object.keys(values || {});
+    const keys=Object.keys(defs).length ? Object.keys(defs) : Object.keys(values || {});
     if(!keys.length){
       box.innerHTML='<p class="survey-empty">No survey responses available.</p>';
       return;
@@ -258,14 +255,14 @@
     for(const key of keys){
       const row=document.createElement("div");
       row.className="survey-row";
-      const dt=document.createElement("div");
-      dt.className="survey-question";
-      dt.textContent=defs[key] || key.toUpperCase();
-      const dd=document.createElement("div");
-      dd.className="survey-answer";
-      dd.textContent=surveyValue(values?.[key]);
-      if(dd.textContent==="—")dd.classList.add("missing");
-      row.append(dt,dd);
+      const q=document.createElement("div");
+      q.className="survey-question";
+      q.textContent=defs[key] || key.toUpperCase();
+      const a=document.createElement("div");
+      a.className="survey-answer";
+      a.textContent=surveyValue(values?.[key]);
+      if(a.textContent==="—")a.classList.add("missing");
+      row.append(q,a);
       box.appendChild(row);
     }
   }
@@ -903,7 +900,7 @@
       updateAffectAvailability();
       renderSurvey();
       renderStimulusTrack(); renderAt(0); updateQuality(); updateCoverage();
-      status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · participant <strong>${fmt(recordingEndSec)}</strong> · surface gaze <strong>${fmt(gazeStartSec)}–${fmt(gazeEndSec)}</strong>${affect.length?` · ${affect.length.toLocaleString()} affect samples`:''}${survey?` · survey`:''}`;
+      status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · participant <strong>${fmt(recordingEndSec)}</strong> · surface gaze <strong>${fmt(gazeStartSec)}–${fmt(gazeEndSec)}</strong>${affect.length?` · ${affect.length.toLocaleString()} affect samples`:''}`;
       if(auto)setTimeout(()=>{ if(token===participantLoadToken && currentParticipant===id) autoSync(); },120);
     }catch(err){
       if(token!==participantLoadToken || currentParticipant!==id)return;
