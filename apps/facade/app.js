@@ -771,9 +771,16 @@
       return "";
     }
     select.disabled=false;
-	const preferred=participantIds[0];
-	select.value=preferred;
-	return preferred;
+    const params=new URLSearchParams(window.location.search);
+    const requested=(params.get("p")||"").trim();
+    const preferred=requested && participantIds.includes(requested) ? requested : participantIds[0];
+    select.value=preferred;
+
+    // Keep the URL canonical so a refresh/bookmark reopens the same participant.
+    const url=new URL(window.location.href);
+    url.searchParams.set("p",preferred);
+    history.replaceState(null,"",url);
+    return preferred;
   }
 
   function clearParticipantState(id){
@@ -857,7 +864,13 @@
   ]).then(([s,ids])=>{
     stimuli=s;
     const initial=populateParticipantMenu(ids);
-    $("participant").addEventListener("change",e=>loadParticipant(e.target.value,true));
+    $("participant").addEventListener("change",e=>{
+      const id=e.target.value;
+      const url=new URL(window.location.href);
+      url.searchParams.set("p",id);
+      history.replaceState(null,"",url);
+      loadParticipant(id,true);
+    });
     if(initial)return loadParticipant(initial,true);
   }).catch(err=>{
     console.error(err);
