@@ -12,7 +12,7 @@
   let markers = structuredClone(DEFAULT_MARKERS);
   const markerEls = {tl:$("markerTL"),tr:$("markerTR"),bl:$("markerBL"),br:$("markerBR")};
 
-  let gaze=[], fixations=[], affect=[], stimuli={duration:259,events:[]};
+  let gaze=[], fixations=[], affect=[], survey=null, surveyDefinition=null, stimuli={duration:259,events:[]};
   let recordingZero=0, recordingStartSec=0, recordingEndSec=0, gazeStartSec=0, gazeEndSec=0, sessionTime=0, playing=false, raf=0, lastAnimation=0;
   let sessionDuration=0;
   let currentGazeIndex=-1, currentParticipant="";
@@ -235,6 +235,58 @@
       }
       if(!currentValid&&firstValid)affectHeatMetricSelect.value=firstValid;
     }
+  }
+
+
+  function surveyValue(v){
+    if(v===null || v===undefined || String(v).trim()==="")return "—";
+    return String(v);
+  }
+
+  function renderSurveySection(containerId, sectionName, values){
+    const box=$(containerId);
+    if(!box)return;
+    box.innerHTML="";
+    const defs=surveyDefinition?.[sectionName] || {};
+    const keys=Object.keys(defs).length
+      ? Object.keys(defs)
+      : Object.keys(values || {});
+    if(!keys.length){
+      box.innerHTML='<p class="survey-empty">No survey responses available.</p>';
+      return;
+    }
+    for(const key of keys){
+      const row=document.createElement("div");
+      row.className="survey-row";
+      const dt=document.createElement("div");
+      dt.className="survey-question";
+      dt.textContent=defs[key] || key.toUpperCase();
+      const dd=document.createElement("div");
+      dd.className="survey-answer";
+      dd.textContent=surveyValue(values?.[key]);
+      if(dd.textContent==="—")dd.classList.add("missing");
+      row.append(dt,dd);
+      box.appendChild(row);
+    }
+  }
+
+  function renderSurvey(){
+    const statusEl=$("surveyStatus");
+    if(!survey){
+      if(statusEl){
+        statusEl.className="quality weak";
+        statusEl.textContent="No file";
+      }
+      renderSurveySection("surveyDemographic","demographic",{});
+      renderSurveySection("surveyExperimental","experimental",{});
+      return;
+    }
+    if(statusEl){
+      statusEl.className="quality good";
+      statusEl.textContent="Available";
+    }
+    renderSurveySection("surveyDemographic","demographic",survey.demographic || {});
+    renderSurveySection("surveyExperimental","experimental",survey.experimental || {});
   }
 
   function solve(A,b){
@@ -751,7 +803,8 @@
     return {
       gaze:`data/${id}/gaze.csv`,
       fixations:`data/${id}/fixations.csv`,
-      affect:`data/${id}/affect.txt`
+      affect:`data/${id}/affect.txt`,
+      survey:`data/${id}/survey.json`
     };
   }
 
@@ -787,7 +840,7 @@
     stop();
     syncRunToken++;
     currentParticipant=id;
-    gaze=[]; fixations=[]; affect=[]; gazeTimes=[]; eventPrefix=new Map();
+    gaze=[]; fixations=[]; affect=[]; survey=null; gazeTimes=[]; eventPrefix=new Map();
     recordingZero=0; affectRecordingZeroLocal=0; recordingStartSec=0; recordingEndSec=0; gazeStartSec=0; gazeEndSec=0;
     sessionTime=0; sessionDuration=0; currentGazeIndex=-1;
     syncOffsetInput.value="0.00";
@@ -803,6 +856,7 @@
     renderAffectCurrent(NaN);
     updateAffectAvailability();
     renderAffectChart();
+    renderSurvey();
     renderStimulusTrack();
     updateCoverage();
     status.textContent=`Loading ${id}…`;
@@ -815,13 +869,14 @@
     clearParticipantState(id);
     const cfg=participantConfig(id);
     try{
-      const [g,f,a]=await Promise.all([
+      const [g,f,a,surveyData]=await Promise.all([
         fetch(cfg.gaze).then(r=>{if(!r.ok)throw Error(cfg.gaze);return r.text()}),
         fetch(cfg.fixations).then(r=>r.ok?r.text():"").catch(()=>""),
-        fetch(cfg.affect).then(r=>r.ok?r.text():"").catch(()=>"")
+        fetch(cfg.affect).then(r=>r.ok?r.text():"").catch(()=>""),
+        fetch(cfg.survey).then(r=>r.ok?r.json():null).catch(()=>null)
       ]);
       if(token!==participantLoadToken || currentParticipant!==id)return;
-      gaze=parseGaze(g); fixations=f?parseFixations(f):[]; affect=a?parseAffect(a):[];
+      gaze=parseGaze(g); fixations=f?parseFixations(f):[]; affect=a?parseAffect(a):[]; survey=surveyData;
       // Participant time zero is the earliest available device-time evidence,
       // not necessarily the first gaze sample mapped onto the facade surface.
       const gazeFirstDevice=gaze.length?gaze[0].deviceTimestamp:Infinity;
@@ -836,8 +891,7 @@
       const fixationEndSec=fixations.length
         ? Math.max(...fixations.map(f=>f.start+f.durationMs/1000))-recordingZero
         : 0;
-     
-	recordingEndSec = gaze.length ? gazeEndSec : Math.max(fixationEndSec, 0);
+      recordingEndSec=gaze.length?gazeEndSec:Math.max(fixationEndSec,0);
 
       // Affect timestamps use the local/Unix clock. Convert participant time zero
       // into that clock using the first gaze row, which contains both clock domains.
@@ -847,8 +901,9 @@
       sessionTime=0; syncOffsetInput.value="0.00";
       buildSyncIndex();
       updateAffectAvailability();
+      renderSurvey();
       renderStimulusTrack(); renderAt(0); updateQuality(); updateCoverage();
-      status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · participant <strong>${fmt(recordingEndSec)}</strong> · surface gaze <strong>${fmt(gazeStartSec)}–${fmt(gazeEndSec)}</strong>${affect.length?` · ${affect.length.toLocaleString()} affect samples`:''}`;
+      status.innerHTML=`<strong>${id}</strong> · ${gaze.length.toLocaleString()} gaze samples · ${fixations.length.toLocaleString()} fixations · participant <strong>${fmt(recordingEndSec)}</strong> · surface gaze <strong>${fmt(gazeStartSec)}–${fmt(gazeEndSec)}</strong>${affect.length?` · ${affect.length.toLocaleString()} affect samples`:''}${survey?` · survey`:''}`;
       if(auto)setTimeout(()=>{ if(token===participantLoadToken && currentParticipant===id) autoSync(); },120);
     }catch(err){
       if(token!==participantLoadToken || currentParticipant!==id)return;
@@ -861,9 +916,11 @@
   bindParticipantVideoControls();
   Promise.all([
     fetch("data/stimuli.json").then(r=>{if(!r.ok)throw Error("data/stimuli.json");return r.json()}),
-    fetch("data/participants.json").then(r=>{if(!r.ok)throw Error("data/participants.json");return r.json()})
-  ]).then(([s,ids])=>{
+    fetch("data/participants.json").then(r=>{if(!r.ok)throw Error("data/participants.json");return r.json()}),
+    fetch("data/survey-definition.json").then(r=>r.ok?r.json():null).catch(()=>null)
+  ]).then(([s,ids,definition])=>{
     stimuli=s;
+    surveyDefinition=definition;
     const initial=populateParticipantMenu(ids);
     $("participant").addEventListener("change",e=>{
       const id=e.target.value;
