@@ -836,7 +836,8 @@
       const fixationEndSec=fixations.length
         ? Math.max(...fixations.map(f=>f.start+f.durationMs/1000))-recordingZero
         : 0;
-      recordingEndSec=Math.max(gazeEndSec,fixationEndSec,0);
+     
+	recordingEndSec = gaze.length ? gazeEndSec : Math.max(fixationEndSec, 0);
 
       // Affect timestamps use the local/Unix clock. Convert participant time zero
       // into that clock using the first gaze row, which contains both clock domains.
